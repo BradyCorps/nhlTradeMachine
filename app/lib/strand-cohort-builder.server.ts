@@ -19,16 +19,18 @@ export function buildReferenceCohort(args: {
   players: readonly CheckpointInputs[]; capturedAt: number; source: string;
 }): ReferenceCohort {
   const values: Record<TraitKey, number[]> = { pts_gp: [], sog_gp: [], hd_sog_gp: [], toi_gp: [], oz_time: [] };
-  let n = 0;
+  let n = 0, gpMin = Infinity, gpMax = -Infinity;
   for (const p of args.players) {
     if (!fin(p.gp) || p.gp < args.minGp) continue;
     n++;
+    gpMin = Math.min(gpMin, p.gp); gpMax = Math.max(gpMax, p.gp);
     const t = traitValues(p);
     for (const k of TRAIT_KEYS) if (t[k].value != null) values[k].push(t[k].value!);
   }
   for (const k of TRAIT_KEYS) values[k].sort((a, b) => a - b);
   const content = { season: args.season, gameType: args.gameType, posGroup: args.posGroup,
-    definitionVersion: EVOLUTION_DEFINITION_VERSION, minGp: args.minGp, n, values };
+    definitionVersion: EVOLUTION_DEFINITION_VERSION, minGp: args.minGp,
+    gpMin: n ? gpMin : 0, gpMax: n ? gpMax : 0, n, values };
   return { id: sha256(content), ...content, capturedAt: args.capturedAt, source: args.source };
 }
 

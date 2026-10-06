@@ -17,6 +17,16 @@ const field = (n: number, shift = 0): CheckpointInputs[] =>
     gp: 30, points: 10 + i + shift, toiSecondsPerGame: 900 + i * 10 + shift * 10,
     edgeGp: 30, edgeShotsAll: 50 + i * 2 + shift, edgeHdShots: 10 + i + shift, edgeOzPct: 0.4 + i / 200,
   }));
+/** Players whose games alternate between `lo` and `hi`, so a cohort built from them
+ *  genuinely covers both exposures. Rates (not totals) rise with the index. */
+const spanning = (n: number, shift = 0, lo = 10, hi = 40): CheckpointInputs[] =>
+  Array.from({ length: n }, (_, i) => {
+    const gp = i % 2 ? hi : lo, k = i + shift;
+    return inputs({
+      gp, points: Math.round((0.3 + k * 0.02) * gp), toiSecondsPerGame: 900 + k * 10,
+      edgeGp: gp, edgeShotsAll: Math.round((1.5 + k * 0.05) * gp), edgeHdShots: Math.round((0.4 + k * 0.02) * gp), edgeOzPct: 0.4 + k / 200,
+    });
+  });
 const cohortOf = (players: CheckpointInputs[], minGp = 20) => buildReferenceCohort({
   season: "20262027", gameType: 2, posGroup: "F", minGp, players, capturedAt: 1, source: "fixture",
 });
@@ -105,14 +115,15 @@ describe("reference cohorts: a changing field is not player improvement", () => 
   const earlier = buildProfile({ kind: "checkpoint", label: "10 GP", season: "20262027", gameType: 2, inputs: inputs({ gp: 10, points: 8 }) });
   const sameRates = buildProfile({ kind: "latest", label: "Latest", season: "20262027", gameType: 2, inputs: inputs({ gp: 40, points: 32, edgeGp: 40, edgeShotsAll: 124, edgeHdShots: 36 }) });
   it("ranks both profiles in one pinned cohort, so identical rates show no percentile change", () => {
-    const c = cohortOf(field(30));
+    const c = cohortOf(spanning(40), 5);
+    expect(c).toMatchObject({ gpMin: 10, gpMax: 40 });
     const { rows, sameCohort } = compareProfiles(earlier, sameRates, c, c);
     expect(sameCohort).toBe(true);
     expect(rows.find(r => r.key === "pts_gp")!.pctDelta).toBe(0);
     expect(rows.find(r => r.key === "pts_gp")!.cohortMedian).not.toBeNull();
   });
   it("refuses to difference percentiles taken from two different fields", () => {
-    const a = cohortOf(field(30)), b = cohortOf(field(30, 8)); // a stronger league later
+    const a = cohortOf(spanning(40), 5), b = cohortOf(spanning(40, 8), 5); // a stronger league later
     expect(a.id).not.toBe(b.id);
     const { rows, sameCohort } = compareProfiles(earlier, sameRates, a, b);
     expect(sameCohort).toBe(false);
@@ -121,9 +132,9 @@ describe("reference cohorts: a changing field is not player improvement", () => 
     expect(rows[0].earlier.pct).not.toBe(rows[0].later.pct);
   });
   it("a pinned comparison does not move when other cohorts exist or later grow", () => {
-    const pinned = cohortOf(field(30));
+    const pinned = cohortOf(spanning(40), 5);
     const before = compareProfiles(earlier, sameRates, pinned, pinned);
-    cohortOf(field(60, 5)); // a later, bigger cohort elsewhere
+    cohortOf(spanning(80, 5), 5); // a later, bigger cohort elsewhere
     expect(compareProfiles(earlier, sameRates, pinned, pinned)).toEqual(before);
   });
   it("hashes content: identical populations share an id, and a thin cohort gives no percentile", () => {
@@ -141,7 +152,7 @@ describe("reference cohorts: a changing field is not player improvement", () => 
 
 describe("the page payload", () => {
   const latest = inputs({ gp: 30, points: 21, edgeGp: 30, edgeShotsAll: 90, edgeHdShots: 20 });
-  const cohort = cohortOf(field(30));
+  const cohort = cohortOf(spanning(40), 5);
   const stored = (milestone: StoredCheckpoint["milestone"], observedGp: number, revision = 0, over: Partial<CheckpointInputs> = {}): StoredCheckpoint => ({
     milestone, revision, status: "observed", observedGp, capturedAt: Date.UTC(2026, 10, 1), sourceAsOf: null,
     inputs: inputs({ gp: observedGp, edgeGp: observedGp, ...over }), cohort, provenance: {},
@@ -209,5 +220,76 @@ describe("independence from NAV and production selection", () => {
       const imports = readFileSync(f, "utf8").split("\n").filter(l => /^\s*(import|export) .* from /.test(l)).join("\n");
       expect(imports, f).not.toMatch(/xnav|asset-nav|calcNAV|valuation|gravity|season-snapshot|labs|feature-flag|roster-assembly|cached-roster/i);
     }
+  });
+});
+
+describe("checkpoint comparability", () => {
+  const early = buildProfile({ kind: "checkpoint", label: "12 GP", season: "20262027", gameType: 2, inputs: inputs({ gp: 12, points: 7, edgeGp: 12 }) });
+  const late = buildProfile({ kind: "latest", label: "Latest", season: "20262027", gameType: 2, inputs: inputs({ gp: 40, points: 28, edgeGp: 40, edgeShotsAll: 120, edgeHdShots: 30 }) });
+  const narrow = cohortOf(field(30).map(p => ({ ...p, gp: 12, edgeGp: 12 })), 5); // ranked players had 12 GP
+
+  it("does not rank a 40-game rate in a field of 12-game rates", () => {
+    const { rows, sameCohort, withheld } = compareProfiles(early, late, narrow, narrow);
+    expect(sameCohort).toBe(false);
+    expect(rows.every(r => r.later.pct === null && r.pctDelta === null)).toBe(true);
+    expect(rows.some(r => r.earlier.pct !== null)).toBe(true);       // the in-range side is still ranked
+    expect(withheld.join(" ")).toMatch(/Latest: percentiles withheld; 40 GP is outside the cohort's 12–12 GP range/);
+    expect(rows.find(r => r.key === "pts_gp")!.delta).not.toBeNull(); // raw rates are still compared
+  });
+  it("surfaces the withholding reason in the page payload", () => {
+    const v = buildEvolutionView({
+      season: "20262027", gameType: 2, latestInputs: inputs({ gp: 40, points: 28, edgeGp: 40 }), latestCapturedAt: 1, latestCohort: null,
+      baselineSeason: null, baselineInputs: null, baselineCohort: null, storeUnavailable: false,
+      checkpoints: [{
+        milestone: "10" as const, revision: 0, status: "observed" as const, observedGp: 12, capturedAt: 1, sourceAsOf: null,
+        inputs: inputs({ gp: 12, edgeGp: 12 }), cohort: narrow, provenance: {},
+      }],
+    });
+    expect(v.options[0].withheldNotes.join(" ")).toMatch(/outside the cohort's 12–12 GP range/);
+    expect(v.options[0].rows.every(r => r.pctDelta === null)).toBe(true);
+  });
+  it("refuses a cohort from another season, competition or metric definition", () => {
+    const wide = cohortOf(spanning(40), 5);
+    const otherSeason = { ...wide, season: "20252026" }, playoffs = { ...wide, gameType: 3 }, oldDef = { ...wide, definitionVersion: "strand-evo-v0" };
+    for (const c of [otherSeason, playoffs, oldDef]) {
+      const { rows } = compareProfiles(early, late, c, c);
+      expect(rows.every(r => r.earlier.pct === null && r.later.pct === null)).toBe(true);
+    }
+  });
+  it("computes no change at all between profiles built from different definitions", () => {
+    const old = { ...early, definitionVersion: "strand-evo-v0" };
+    const { rows, compatible, withheld } = compareProfiles(old, late, null, null);
+    expect(compatible).toBe(false);
+    expect(rows.every(r => r.delta === null && r.summary === null && r.pctDelta === null)).toBe(true);
+    expect(withheld[0]).toMatch(/different metric definitions/);
+  });
+  it("does not rank a trait measured for only a minority of the cohort", () => {
+    // 30 ranked players, but only 12 have an aligned EDGE sample (the clubs captured tonight).
+    const partial = cohortOf(spanning(30).map((p, i) => i < 12 ? p : { ...p, edgeGp: null, edgeShotsAll: null, edgeHdShots: null, edgeOzPct: null }), 5);
+    expect(partial.values.sog_gp).toHaveLength(12);
+    const { rows } = compareProfiles(early, buildProfile({ kind: "latest", label: "Latest", season: "20262027", gameType: 2, inputs: inputs({ gp: 12, edgeGp: 12 }) }), partial, partial);
+    expect(rows.find(r => r.key === "sog_gp")!.earlier.pct).toBeNull();
+    expect(rows.find(r => r.key === "pts_gp")!.earlier.pct).not.toBeNull();
+  });
+});
+
+describe("source units and mixed timestamps cannot manufacture a rate", () => {
+  it("rejects a unit mistake instead of printing it", () => {
+    expect(traitValues(inputs({ toiSecondsPerGame: 18.4 })).toi_gp.missing).toMatch(/unit check failed/);   // minutes, not seconds
+    expect(traitValues(inputs({ toiSecondsPerGame: 7200 })).toi_gp.value).toBeNull();
+    expect(traitValues(inputs({ edgeOzPct: 52 })).oz_time.value).toBeNull();                                 // percent, not fraction
+    expect(traitValues(inputs({ edgeShotsAll: 400 })).sog_gp.missing).toMatch(/unit check failed/);          // 40 shots/GP
+    expect(traitValues(inputs({ edgeShotsAll: 5, edgeHdShots: 9 })).hd_sog_gp.missing).toMatch(/exceed all shots/);
+    expect(traitValues(inputs({ points: 80 })).pts_gp.missing).toMatch(/unit check failed/);
+    expect(traitValues(inputs()).toi_gp.value).toBeCloseTo(18);                                              // sane input unaffected
+  });
+  it("never divides EDGE totals by a different games count, in either direction", () => {
+    const stale = traitValues(inputs({ gp: 12, edgeGp: 9, edgeShotsAll: 31 }));    // EDGE row from before the last games
+    const ahead = traitValues(inputs({ gp: 12, edgeGp: 13, edgeShotsAll: 40 }));   // EDGE row from after the summary
+    for (const t of [stale, ahead]) { expect(t.sog_gp.value).toBeNull(); expect(t.hd_sog_gp.value).toBeNull(); expect(t.oz_time.value).toBeNull(); }
+    expect(stale.pts_gp.value).toBeCloseTo(0.5); // the summary-only traits stand
+  });
+  it("accepts an older EDGE row only when the games are identical, and says nothing else changed", () => {
+    expect(traitValues(inputs({ gp: 12, edgeGp: 12, edgeShotsAll: 36 })).sog_gp.value).toBeCloseTo(3);
   });
 });

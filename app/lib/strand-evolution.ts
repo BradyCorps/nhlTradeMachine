@@ -118,6 +118,16 @@ export interface TraitValue {
 
 const fin = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
+// Plausibility bounds. They exist to catch a UNIT mistake (minutes where seconds
+// were expected, a percentage where a fraction was), not to judge a player: a
+// value outside them is reported as missing with the reason, never clamped.
+export const PLAUSIBLE = {
+  toiSecondsPerGame: [60, 3600],   // 1 to 60 minutes; the NHL summary reports whole seconds
+  pointsPerGame: [0, 5],
+  shotsPerGame: [0, 20],
+} as const;
+const within = (v: number, [lo, hi]: readonly [number, number]) => v >= lo && v <= hi;
+
 export function traitValues(i: CheckpointInputs): Record<TraitKey, TraitValue> {
   const gpOk = fin(i.gp) && i.gp > 0;
   const noGp = "no games played";
@@ -126,23 +136,30 @@ export function traitValues(i: CheckpointInputs): Record<TraitKey, TraitValue> {
     : !gpOk ? noGp
     : `EDGE sample is ${i.edgeGp} GP but the NHL summary says ${i.gp} GP; not combined`;
   const none = (missing: string): TraitValue => ({ value: null, exposure: "—", missing });
+  const gp = i.gp as number;
+
+  const pointsOk = gpOk && fin(i.points) && i.points >= 0;
+  const toiOk = gpOk && fin(i.toiSecondsPerGame);
+  const shotsOk = edgeAligned && fin(i.edgeShotsAll) && i.edgeShotsAll >= 0;
+  const hdOk = edgeAligned && fin(i.edgeHdShots) && i.edgeHdShots >= 0;
 
   return {
-    pts_gp: gpOk && fin(i.points) && i.points >= 0
-      ? { value: i.points / i.gp!, exposure: `${i.points} pts in ${i.gp} GP`, missing: null }
-      : none(!gpOk ? noGp : "points not reported"),
-    toi_gp: gpOk && fin(i.toiSecondsPerGame) && i.toiSecondsPerGame >= 0
-      ? { value: i.toiSecondsPerGame / 60, exposure: `${i.gp} GP · about ${Math.round(i.toiSecondsPerGame * i.gp! / 60)} min`, missing: null }
-      : none(!gpOk ? noGp : "ice time not reported"),
-    sog_gp: edgeAligned && fin(i.edgeShotsAll) && i.edgeShotsAll >= 0
-      ? { value: i.edgeShotsAll / i.gp!, exposure: `${i.edgeShotsAll} shots in ${i.gp} GP`, missing: null }
-      : none(edgeAligned ? "shot count not reported" : edgeWhy),
-    hd_sog_gp: edgeAligned && fin(i.edgeHdShots) && i.edgeHdShots >= 0
-      ? { value: i.edgeHdShots / i.gp!, exposure: `${i.edgeHdShots} high-danger shots in ${i.gp} GP`, missing: null }
-      : none(edgeAligned ? "high-danger shot count not reported" : edgeWhy),
+    pts_gp: !pointsOk ? none(!gpOk ? noGp : "points not reported")
+      : !within(i.points! / gp, PLAUSIBLE.pointsPerGame) ? none("points per game outside the plausible range; unit check failed")
+      : { value: i.points! / gp, exposure: `${i.points} pts in ${gp} GP`, missing: null },
+    toi_gp: !toiOk ? none(!gpOk ? noGp : "ice time not reported")
+      : !within(i.toiSecondsPerGame!, PLAUSIBLE.toiSecondsPerGame) ? none("ice time outside 1–60 minutes per game; expected whole seconds, unit check failed")
+      : { value: i.toiSecondsPerGame! / 60, exposure: `${gp} GP · about ${Math.round(i.toiSecondsPerGame! * gp / 60)} min`, missing: null },
+    sog_gp: !shotsOk ? none(edgeAligned ? "shot count not reported" : edgeWhy)
+      : !within(i.edgeShotsAll! / gp, PLAUSIBLE.shotsPerGame) ? none("shots per game outside the plausible range; unit check failed")
+      : { value: i.edgeShotsAll! / gp, exposure: `${i.edgeShotsAll} shots in ${gp} GP`, missing: null },
+    hd_sog_gp: !hdOk ? none(edgeAligned ? "high-danger shot count not reported" : edgeWhy)
+      : fin(i.edgeShotsAll) && i.edgeHdShots! > i.edgeShotsAll ? none("high-danger shots exceed all shots; inconsistent EDGE row")
+      : !within(i.edgeHdShots! / gp, PLAUSIBLE.shotsPerGame) ? none("high-danger shots per game outside the plausible range; unit check failed")
+      : { value: i.edgeHdShots! / gp, exposure: `${i.edgeHdShots} high-danger shots in ${gp} GP`, missing: null },
     oz_time: edgeAligned && fin(i.edgeOzPct) && i.edgeOzPct >= 0 && i.edgeOzPct <= 1
-      ? { value: i.edgeOzPct * 100, exposure: `${i.gp} GP`, missing: null }
-      : none(edgeAligned ? "zone time not reported" : edgeWhy),
+      ? { value: i.edgeOzPct * 100, exposure: `${gp} GP`, missing: null }
+      : none(edgeAligned ? "zone time not reported or not a 0–1 fraction" : edgeWhy),
   };
 }
 
@@ -199,6 +216,11 @@ export interface ReferenceCohort {
   posGroup: "F" | "D";
   definitionVersion: string;
   minGp: number;
+  /** Fewest and most games among the players actually ranked. A profile whose
+   *  own games fall outside this range is NOT ranked against the cohort: a rate
+   *  over 40 games is not comparable with a field of 10-game rates. */
+  gpMin: number;
+  gpMax: number;
   n: number;
   /** Ascending, non-missing values per trait. */
   values: Record<TraitKey, number[]>;
@@ -206,19 +228,32 @@ export interface ReferenceCohort {
   source: string;
 }
 
-/** Percentile of a value in a cohort (mid-rank ties; null under 10 values). */
-export const cohortPercentile = (cohort: ReferenceCohort | null, key: TraitKey, value: number | null): number | null =>
-  cohort && value != null ? metricPercentile(value, cohort.values[key]) : null;
+/** Whether a profile's exposure sits inside the range the cohort was built from. */
+export const cohortCovers = (cohort: ReferenceCohort | null, gp: number | null): boolean =>
+  cohort != null && gp != null && gp >= cohort.gpMin && gp <= cohort.gpMax;
+
+/** Minimum share of the ranked players that must have a value for a trait before
+ *  that trait is ranked at all. A trait measured for a small, non-random subset
+ *  (say the four clubs whose EDGE rows happened to align tonight) would rank a
+ *  player against those clubs, not the league. */
+export const TRAIT_COVERAGE_FLOOR = 0.5;
+export const traitCohortUsable = (cohort: ReferenceCohort | null, key: TraitKey): boolean =>
+  cohort != null && cohort.values[key].length >= Math.max(10, Math.ceil(cohort.n * TRAIT_COVERAGE_FLOOR));
+
+/** Percentile of a value in a cohort (mid-rank ties). Null when the trait is too
+ *  thinly covered, or the profile's games are outside the cohort's exposure range. */
+export const cohortPercentile = (cohort: ReferenceCohort | null, key: TraitKey, value: number | null, gp: number | null): number | null =>
+  value != null && cohortCovers(cohort, gp) && traitCohortUsable(cohort, key) ? metricPercentile(value, cohort!.values[key]) : null;
 
 export function cohortMedian(cohort: ReferenceCohort | null, key: TraitKey): number | null {
-  const v = cohort?.values[key];
-  if (!v || v.length < 10) return null;
+  if (!cohort || !traitCohortUsable(cohort, key)) return null;
+  const v = cohort.values[key];
   const m = Math.floor(v.length / 2);
   return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
 }
 
 export const cohortLabel = (c: ReferenceCohort): string =>
-  `${c.posGroup === "F" ? "forwards" : "defensemen"} with ≥${c.minGp} GP in ${c.season.slice(0, 4)}–${c.season.slice(6)} (${c.gameType === 2 ? "regular season" : "playoffs"}), n=${c.n}, version ${c.id.slice(0, 8)}`;
+  `${c.posGroup === "F" ? "forwards" : "defensemen"} with ≥${c.minGp} GP (ranked players had ${c.gpMin}–${c.gpMax} GP) in ${c.season.slice(0, 4)}–${c.season.slice(6)} (${c.gameType === 2 ? "regular season" : "playoffs"}), n=${c.n}, version ${c.id.slice(0, 8)}`;
 
 // ── Profiles and comparison ──────────────────────────────────────
 
@@ -279,31 +314,50 @@ export function sampleCaveat(gpA: number | null, gpB: number | null): string | n
   return `Based on ${gpA ?? "?"} and ${gpB ?? "?"} games. Rates over a few games move a lot, and a difference here does not show a lasting change in ability.`;
 }
 
+/** Why a cohort may not rank a profile, or null when it may. */
+export function cohortWithheldReason(cohort: ReferenceCohort | null, p: Profile): string | null {
+  if (!cohort) return "no reference cohort";
+  if (cohort.season !== p.season || cohort.gameType !== p.gameType) return "cohort is for a different season or competition";
+  if (cohort.definitionVersion !== p.definitionVersion) return "cohort was built with a different metric definition";
+  if (!cohortCovers(cohort, p.gp)) return `${p.gp ?? "?"} GP is outside the cohort's ${cohort.gpMin}–${cohort.gpMax} GP range, so ranking it there would compare different exposures`;
+  return null;
+}
+
 /**
  * Compare two profiles. `earlierCohort` and `laterCohort` are the cohorts each
  * is ranked against. A pinned checkpoint comparison passes the SAME cohort for
  * both; only then is a percentile difference produced, because only then can it
- * be attributed to the player rather than to a different field.
+ * be attributed to the player rather than to a different field. Every number is
+ * withheld, not approximated, when the two profiles were built from different
+ * metric definitions, and a cohort never ranks a profile of another season,
+ * competition or exposure.
  */
 export function compareProfiles(
   earlier: Profile, later: Profile,
   earlierCohort: ReferenceCohort | null, laterCohort: ReferenceCohort | null,
-): { rows: ComparisonRow[]; sameCohort: boolean } {
-  const sameCohort = earlierCohort != null && laterCohort != null && earlierCohort.id === laterCohort.id;
+): { rows: ComparisonRow[]; sameCohort: boolean; compatible: boolean; withheld: string[] } {
+  const compatible = earlier.definitionVersion === later.definitionVersion;
+  const whyEarlier = cohortWithheldReason(earlierCohort, earlier), whyLater = cohortWithheldReason(laterCohort, later);
+  const ec = whyEarlier ? null : earlierCohort, lc = whyLater ? null : laterCohort;
+  const sameCohort = ec != null && lc != null && ec.id === lc.id;
+  const withheld: string[] = [];
+  if (!compatible) withheld.push("The two profiles use different metric definitions, so no change is computed.");
+  if (earlierCohort && whyEarlier) withheld.push(`${earlier.label}: percentiles withheld; ${whyEarlier}.`);
+  if (laterCohort && whyLater) withheld.push(`Latest: percentiles withheld; ${whyLater}.`);
   const name = earlier.kind === "baseline" ? `the ${earlier.label}` : `the ${earlier.label} checkpoint`;
   const rows = TRAIT_KEYS.map((key): ComparisonRow => {
     const a = earlier.traits[key], b = later.traits[key];
-    const pa = cohortPercentile(earlierCohort, key, a.value), pb = cohortPercentile(laterCohort, key, b.value);
+    const pa = cohortPercentile(ec, key, a.value, earlier.gp), pb = cohortPercentile(lc, key, b.value, later.gp);
     return {
       key, label: TRAITS[key].label, unit: TRAITS[key].unit, rail: TRAITS[key].rail, source: TRAITS[key].source,
       earlier: { ...a, pct: pa }, later: { ...b, pct: pb },
-      delta: a.value != null && b.value != null ? b.value - a.value : null,
-      pctDelta: sameCohort && pa != null && pb != null ? pb - pa : null,
-      cohortMedian: sameCohort ? cohortMedian(laterCohort, key) : null,
-      summary: describeChange(key, a.value, b.value, name),
+      delta: compatible && a.value != null && b.value != null ? b.value - a.value : null,
+      pctDelta: compatible && sameCohort && pa != null && pb != null ? pb - pa : null,
+      cohortMedian: sameCohort ? cohortMedian(lc, key) : null,
+      summary: compatible ? describeChange(key, a.value, b.value, name) : null,
     };
   });
-  return { rows, sameCohort };
+  return { rows, sameCohort, compatible, withheld };
 }
 
 // ── The page payload ─────────────────────────────────────────────
@@ -332,6 +386,8 @@ export interface EvolutionOption {
   /** How both profiles were ranked, named. */
   cohortNote: string;
   caveat: string | null;
+  /** Why any percentile or change was withheld; empty when nothing was. */
+  withheldNotes: string[];
   revisionNote: string | null;
   provenanceNote: string;
 }
@@ -391,13 +447,14 @@ export function buildEvolutionView(args: {
         kind: "checkpoint", label: checkpointLabel(m, c.observedGp), season: args.season, gameType: 2, inputs: c.inputs,
         capturedAt: c.capturedAt, sourceAsOf: c.sourceAsOf, status: c.status,
       });
-      const { rows, sameCohort } = compareProfiles(earlier, latest, c.cohort, c.cohort);
+      const { rows, sameCohort, withheld } = compareProfiles(earlier, latest, c.cohort, c.cohort);
       options.push({
         id: `cp-${m}`, kind: "checkpoint", label: earlier.label, earlier, rows, sameCohort,
         cohortNote: c.cohort
           ? `Both profiles are ranked against one pinned reference cohort: ${cohortLabel(c.cohort)}. Percentile changes therefore reflect the player, not a changing field.`
           : "No reference cohort was stored with this checkpoint, so percentiles are unavailable; raw rates are shown.",
         caveat: sampleCaveat(earlier.gp, latest.gp),
+        withheldNotes: withheld,
         revisionNote: c.revision > 0 ? `Source correction: revision ${c.revision}. The original capture is retained.` : null,
         provenanceNote: `${c.status === "observed" ? "Observed at capture" : "Reconstructed from dated source inputs"} · captured ${new Date(c.capturedAt).toISOString().slice(0, 10)} · NHL feeds supply no as-of timestamp · definition ${EVOLUTION_DEFINITION_VERSION}`,
       });
@@ -407,11 +464,12 @@ export function buildEvolutionView(args: {
     const earlier = buildProfile({
       kind: "baseline", label: `${seasonDash(args.baselineSeason)} full season`, season: args.baselineSeason, gameType: 2, inputs: args.baselineInputs,
     });
-    const { rows, sameCohort } = compareProfiles(earlier, latest, args.baselineCohort, args.latestCohort);
+    const { rows, sameCohort, withheld } = compareProfiles(earlier, latest, args.baselineCohort, args.latestCohort);
     options.push({
       id: "baseline", kind: "baseline", label: earlier.label, earlier, rows, sameCohort,
       cohortNote: `Historical rankings, each against its own season: ${args.baselineCohort ? cohortLabel(args.baselineCohort) : "baseline cohort unavailable"}; latest: ${args.latestCohort ? cohortLabel(args.latestCohort) : "no cohort yet"}. Different fields, so percentile changes are not computed; compare the raw rates.`,
       caveat: sampleCaveat(earlier.gp, latest.gp),
+      withheldNotes: withheld,
       revisionNote: null,
       provenanceNote: "Final regular-season rates from the NHL feeds, read live; not a stored checkpoint.",
     });

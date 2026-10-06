@@ -62,8 +62,8 @@ describe("capture", () => {
     expect(stored).toHaveLength(1);
     expect(stored[0]).toMatchObject({ milestone: "10", observedGp: 12, status: "observed", revision: 0 });
     expect(stored[0].inputs).toMatchObject({ gp: 12, points: 6, toiSecondsPerGame: 1180, edgeGp: 12 });
-    expect(stored[0].cohort).toMatchObject({ season: SEASON, gameType: 2, posGroup: "F", n: 25, minGp: cohortMinGpFor("10") });
-    expect(stored[0].provenance).toMatchObject({ summary: { report: "skater/summary", retrievedAt: 5_000 }, edge: { table: "nhl_snapshots", capturedAt: 1_000 } });
+    expect(stored[0].cohort).toMatchObject({ season: SEASON, gameType: 2, posGroup: "F", n: 25, minGp: cohortMinGpFor("10"), gpMin: 12, gpMax: 12 });
+    expect(stored[0].provenance).toMatchObject({ summary: { report: "skater/summary", retrievedAt: 5_000 }, edge: { table: "nhl_snapshots", capturedAt: 1_000, lagBehindSummaryMs: 4_000 } });
     expect(await count(client, "strand_reference_cohorts")).toBe(1);
   });
 

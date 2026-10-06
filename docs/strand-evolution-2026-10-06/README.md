@@ -1,9 +1,15 @@
-# STRAND evolution (stage 2)
+# Season profile evolution (stage 2)
 
-A compact panel in the player dossier that shows how a skater's *measured*
-profile changes through a season (checkpoint vs latest) and against last
-season's full-season rates. Descriptive only. Independent of NAV: no module in
-this feature imports a valuation, gravity, snapshot-batch or flag module (tested).
+A compact panel in the player dossier, titled **Season profile evolution ·
+current-season observations**. It shows how a skater's *measured* rates change
+through a season (checkpoint vs latest) and against last season's full-season
+rates. **It is not the eight-trait STRAND.** It tracks five different traits
+(points, ice time, shots, high-danger shots, offensive-zone time); the original
+STRAND is the historical analytical profile built from the 2025-26 baseline and
+does not evolve during the season. The panel says so on its face.
+
+Descriptive only. Independent of NAV: no module in this feature imports a
+valuation, gravity, snapshot-batch or flag module (tested).
 
 ## Data feasibility: where every STRAND trait comes from
 
@@ -62,14 +68,49 @@ same dated capture. Production was not inspected.
   the pinned reference cohort id, and provenance (summary report and retrieval time,
   EDGE row capture time, plan reason).
 - Reference cohorts are content-addressed (sha256) and immutable: same-position-group
-  skaters with at least `target − 5` GP (≥ 20 for `END`) at capture, with the
-  sorted values per trait, so every percentile can be reproduced exactly.
+  skaters with at least `target − 5` GP (≥ 20 for `END`) at capture, the games range of
+  those who were ranked, and the sorted values per trait, so every percentile can be
+  reproduced exactly.
+
+## Source verification status
+
+**Not verified against the live feeds.** The build environment cannot reach `api.nhle.com` or `api-web.nhle.com`. What is established, and how:
+
+| Assumption | Evidence | Status |
+|---|---|---|
+| `timeOnIcePerGame` is whole seconds | `scripts/gravity-calibration/core.ts` (fitted on real NHL data) names it `…Seconds` and filters at `5 * 60` | indirect |
+| `points`, `gamesPlayed`, `playerId` in the skater summary | already read by the shipped observed-stats reader and its tests | indirect |
+| EDGE `player.gamesPlayed`, `sogSummary[all/high].shots`, `zoneTimeDetails.offensiveZonePctg` as a 0-1 fraction | recorded fixture in `__tests__/nhl-player-feed.test.ts` and `parseEdge` | indirect |
+| EDGE shots are all strengths vs 5v5 | unknown | **open** |
+| Whether `sogDetails` sum to the `all` shots | unknown | **open** |
+| Any as-of timestamp in the payloads | none is read; capture time is the only timestamp used | **open** |
+| How far an EDGE row can lag the summary | unknown; the 8-day cron rotation implies days | **open** |
+
+To close them: run `npx tsx scripts/verify-strand-evolution-sources.ts` where the NHL is reachable and attach the output to the PR. It prints the field shapes, whole-second range, zone-time range, shot consistency, EDGE-vs-summary game alignment, and any as-of field. The checker behind it (`app/lib/strand-source-check.ts`) is unit-tested on fixtures; that proves the checker, not the feed.
+
+The code also refuses to print a rate that fails a plausibility check (ice time outside 1-60 minutes, points over 5 per game, more than 20 shots per game, high-danger shots above all shots, zone share outside 0-1). It reports the value as missing with the reason. A silent unit error cannot become a rate.
+
+## Mixed-source timestamps
+
+Summary and EDGE are separate reads at separate times. Their totals are only combined when the EDGE games equal the summary games for that player, so a rate is never a count from one moment divided by games from another. An older EDGE row with identical games is accepted and its lag is stored in provenance (`lagBehindSummaryMs`). Summary-only traits are unaffected by an EDGE mismatch.
 
 ## Comparison rules
 
 - Rates only; exposure printed in each cell. No cumulative totals compared.
 - A checkpoint comparison ranks both profiles in the checkpoint's one pinned cohort, so
   a percentile change is the player's. The cohort's median is shown for context.
+- A cohort ranks a profile only if (a) season, competition and metric definition match,
+  (b) the profile's games fall inside the games range of the players who were ranked
+  (`gp_min`..`gp_max`), and (c) the trait has a value for at least half of those
+  players and at least 10. Otherwise that percentile is withheld and the reason is
+  printed. Consequence: a checkpoint cohort built when players had about 10-15 games
+  will not rank a 40-game rate, so percentile *changes* appear only when both
+  profiles sit inside that range, and raw rates are what carries a long comparison.
+- Profiles built from different metric definitions get no change computed at all.
+- EDGE-trait percentiles need a league-wide, games-aligned EDGE capture. The nightly cron
+  rotates four clubs a night, so EDGE rows for the rest of the league are days old and
+  fail the games-alignment rule; until a league-wide aligned pull exists those
+  percentiles are withheld by the coverage rule and only raw EDGE rates are shown.
 - Baseline (2025-26) vs latest uses each season's own live cohort. Percentiles are shown
   but **not differenced**; compare the raw rates. EDGE traits have no live league cohort,
   so their percentiles appear only for pinned checkpoints.

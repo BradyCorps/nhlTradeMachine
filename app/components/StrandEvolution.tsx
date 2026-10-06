@@ -134,6 +134,7 @@ function Comparison({ option, latestGp, latestAt }: { option: EvolutionOption; l
         <p>{option.provenanceNote}</p>
         <p>Latest: {latestGp ?? "?"} GP, read {dateOf(latestAt)} (when the app read the NHL feeds; the feeds carry no as-of time).</p>
         {option.revisionNote && <p>{option.revisionNote}</p>}
+        {option.withheldNotes.map(n => <p key={n}>{n}</p>)}
         {missingNotes.length > 0 && (
           <details>
             <summary className="cursor-pointer font-black" style={{ minHeight: 24 }}>Missing data ({missingNotes.length})</summary>
@@ -167,11 +168,13 @@ export default function StrandEvolution({ view }: { view: EvolutionView }) {
   const shown = mode === "season" ? cp : baseline;
 
   return (
-    <section aria-label="STRAND evolution" className="border p-4 mb-4" style={{ borderColor: rule, background: "var(--paper-card, var(--paper-inset))" }}>
-      <div className="text-[9px] font-black font-mono uppercase tracking-[0.18em]" style={{ color: faint }}>STRAND evolution</div>
+    <section aria-label="Season profile evolution" className="border p-4 mb-4" style={{ borderColor: rule, background: "var(--paper-card, var(--paper-inset))" }}>
+      <div className="text-[9px] font-black font-mono uppercase tracking-[0.18em]" style={{ color: faint }}>Season profile evolution · current-season observations</div>
       <p className="mt-1 mb-3 text-[10px] font-mono leading-relaxed" style={{ color: faint }}>
-        Observed rates for {view.seasonLabel}, compared like for like. Descriptive only; it is not part of NAV and
-        does not say whether a player has changed in ability.
+        Observed rates for {view.seasonLabel}: points, ice time, shots, high-danger shots and offensive-zone time.
+        This is <strong>not</strong> the eight-trait STRAND above, which is the historical analytical profile
+        built from the 2025–26 baseline and does not update during the season. Descriptive only; it is not part
+        of NAV and does not say whether a player has changed in ability.
       </p>
 
       {!view.supported ? (
@@ -233,9 +236,9 @@ export default function StrandEvolution({ view }: { view: EvolutionView }) {
 
       <details className="mt-3 text-[10px] font-mono leading-relaxed" style={{ color: faint }}>
         <summary className="cursor-pointer font-black" style={{ minHeight: 24 }}>
-          STRAND traits not available for the current season ({view.unavailableTraits.length})
+          Original STRAND traits with no current-season source ({view.unavailableTraits.length})
         </summary>
-        <p className="mt-1">These stay on the main STRAND, built from the 2025–26 baseline. They are not mixed into this panel or shown as current.</p>
+        <p className="mt-1">These stay on the main STRAND, built from the 2025–26 baseline. They are not mixed into this panel or shown as current, so most of the original STRAND does not evolve here.</p>
         <ul className="list-disc pl-4">
           {view.unavailableTraits.map(t => <li key={t.label}><strong>{t.label}</strong>: {t.reason}</li>)}
         </ul>

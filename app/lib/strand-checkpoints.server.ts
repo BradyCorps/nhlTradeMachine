@@ -115,7 +115,7 @@ export async function captureStrandCheckpoints(db: Db, a: CaptureArgs): Promise<
     });
     const written = await db.insert(strandReferenceCohorts).values({
       id: cohort.id, season: cohort.season, gameType: cohort.gameType, posGroup: cohort.posGroup,
-      definitionVersion: cohort.definitionVersion, minGp: cohort.minGp, n: cohort.n,
+      definitionVersion: cohort.definitionVersion, minGp: cohort.minGp, gpMin: cohort.gpMin, gpMax: cohort.gpMax, n: cohort.n,
       valuesJson: JSON.stringify(cohort.values),
       provenanceJson: JSON.stringify({ source: cohort.source, summaryRetrievedAt: a.summaryRetrievedAt }),
       capturedAt: cohort.capturedAt,
@@ -155,7 +155,7 @@ export async function captureStrandCheckpoints(db: Db, a: CaptureArgs): Promise<
       inputsJson: JSON.stringify(p.inputs), missingJson: JSON.stringify(missing), cohortId: cohort.id,
       provenanceJson: JSON.stringify({
         summary: { report: "skater/summary", season: a.season, gameType: a.gameType, retrievedAt: a.summaryRetrievedAt },
-        edge: p.edgeCapturedAt == null ? null : { table: "nhl_snapshots", capturedAt: p.edgeCapturedAt },
+        edge: p.edgeCapturedAt == null ? null : { table: "nhl_snapshots", capturedAt: p.edgeCapturedAt, lagBehindSummaryMs: a.summaryRetrievedAt - p.edgeCapturedAt },
         asOfNote: "NHL feeds carry no as-of timestamp; capturedAt is when this app read them.",
         plan: candidate.reason,
       }),
@@ -186,7 +186,7 @@ export async function readStoredCheckpoints(db: Db, playerId: number, season: st
         const c: any[] = await db.select().from(strandReferenceCohorts).where(eq(strandReferenceCohorts.id, r.cohortId));
         cohortCache.set(r.cohortId, c[0] ? {
           id: c[0].id, season: c[0].season, gameType: c[0].gameType, posGroup: c[0].posGroup,
-          definitionVersion: c[0].definitionVersion, minGp: c[0].minGp, n: c[0].n,
+          definitionVersion: c[0].definitionVersion, minGp: c[0].minGp, gpMin: c[0].gpMin, gpMax: c[0].gpMax, n: c[0].n,
           values: parse(c[0].valuesJson, { pts_gp: [], sog_gp: [], hd_sog_gp: [], toi_gp: [], oz_time: [] }),
           capturedAt: c[0].capturedAt, source: parse<{ source?: string }>(c[0].provenanceJson, {}).source ?? "",
         } : null);

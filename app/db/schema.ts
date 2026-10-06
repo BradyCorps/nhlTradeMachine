@@ -426,6 +426,8 @@ export const strandReferenceCohorts = sqliteTable("strand_reference_cohorts", {
   posGroup:          text("pos_group").notNull(),      // F | D
   definitionVersion: text("definition_version").notNull(),
   minGp:             integer("min_gp").notNull(),
+  gpMin:             integer("gp_min").notNull(),   // fewest GP among ranked players
+  gpMax:             integer("gp_max").notNull(),   // most GP among ranked players
   n:                 integer("n").notNull(),
   valuesJson:        text("values_json").notNull(),    // { traitKey: sorted number[] }
   provenanceJson:    text("provenance_json").notNull(),

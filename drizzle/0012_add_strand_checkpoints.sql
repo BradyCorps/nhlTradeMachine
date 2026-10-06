@@ -5,6 +5,8 @@ CREATE TABLE strand_reference_cohorts (
   pos_group TEXT NOT NULL CHECK (pos_group IN ('F', 'D')),
   definition_version TEXT NOT NULL,
   min_gp INTEGER NOT NULL,
+  gp_min INTEGER NOT NULL,
+  gp_max INTEGER NOT NULL,
   n INTEGER NOT NULL,
   values_json TEXT NOT NULL,
   provenance_json TEXT NOT NULL,
