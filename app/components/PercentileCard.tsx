@@ -7,6 +7,14 @@ import { navValueForDisplay, navLabelForDisplay, marketValueLabel } from "@/app/
 import React, { useMemo, useRef, useCallback, useState } from "react";
 import { ChartData } from "@/app/components/ChartData";
 import CardStrandCompare from "@/app/components/CardStrandCompare";
+import dynamic from "next/dynamic";
+// The radar pulls in Recharts (~350 KiB). It only loads when the reader opens the
+// radar view, so the /players page and every card that stays on the bars pay nothing.
+const PercentileRadar = dynamic(() => import("@/app/components/PercentileRadar"), {
+  ssr: false,
+  loading: () => <p role="status" style={{ fontSize: 11, color: "#6e5a3d" }}>Loading radar… the Detailed values view has every number.</p>,
+});
+import { buildRadarModel, type CardPercentileRow } from "@/app/lib/percentile-radar";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
@@ -134,14 +142,6 @@ function percentileColor(pct: number): string {
   return "#9c2b1f";
 }
 
-function percentileLabel(pct: number): string {
-  if (pct >= 90) return "ELITE";
-  if (pct >= 75) return "ABOVE AVG";
-  if (pct >= 50) return "AVERAGE";
-  if (pct >= 25) return "BELOW AVG";
-  return "POOR";
-}
-
 interface PercentileCardProps {
   player: PlayerData;
   allPlayers: PlayerData[];
@@ -154,8 +154,10 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
   const cardRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
   const [compareSelection, setCompareSelection] = useState<{ forPlayerId: string; player: PlayerData } | null>(null);
+  // Review prototype: bars stay the default; the radar is an alternative view.
+  const [view, setView] = useState<"bars" | "radar">("bars");
 
-  const { percentiles, xnav } = useMemo(() => {
+  const { percentiles, xnav, sortedMaps } = useMemo(() => {
     const peers = allPlayers.filter(p => {
       const g = getPositionGroup(p.position);
       if (g !== posGroup) return false;
@@ -193,7 +195,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
 
     const nav = calculateAssetNAV(player);
 
-    return { percentiles: pcts, xnav: nav };
+    return { percentiles: pcts, xnav: nav, sortedMaps };
   }, [player, allPlayers, posGroup, statDefs]);
 
   const { gravity, gravityPercentile } = useMemo(() => {
@@ -220,10 +222,28 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
   );
   const roles = useMemo(() => derivePlayerRoles(player as any), [player]);
 
-  const scored = percentiles.filter(p => p.pct !== null);
-  const avgPercentile = scored.length > 0
-    ? Math.round(scored.reduce((s, p) => s + (p.pct as number), 0) / scored.length)
-    : null;
+  // The comparison player chosen in the STRAND section below is reused here: one
+  // selection, one picker. Percentiles use the SAME cohort arrays and the same
+  // metricPercentile call as the subject, so nothing is recalculated differently.
+  const comparePlayer = compareSelection?.forPlayerId === player.id ? compareSelection.player : null;
+  const compareRows: CardPercentileRow[] | null = useMemo(() => {
+    if (!comparePlayer) return null;
+    return statDefs.map(stat => {
+      const raw = stat.extract(comparePlayer);
+      const sorted = sortedMaps.get(stat.key) ?? [];
+      const medianVal = sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)] : null;
+      return {
+        key: stat.key, label: stat.label, value: raw,
+        pct: metricPercentile(raw, sorted, stat.invert ?? false),
+        formatted: raw !== null ? (stat.format?.(raw) ?? raw.toFixed(1)) : "—",
+        median: medianVal !== null ? (stat.format?.(medianVal) ?? medianVal.toFixed(1)) : "—",
+      };
+    });
+  }, [comparePlayer, statDefs, sortedMaps]);
+  const radarModel = useMemo(
+    () => buildRadarModel(posGroup, percentiles, compareRows),
+    [posGroup, percentiles, compareRows],
+  );
 
   const peerLabel = posGroup === "F" ? "all forwards" : posGroup === "D" ? "all defensemen" : "all goalies";
 
@@ -302,7 +322,9 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         })),
         navCells: (navValueForDisplay(xnav) === null ? [] : navCells).map(c => ({ label: c.label, val: c.val })),
         peerLabel,
-        avgPercentile,
+        // No combined percentile: it averaged overlapping and usage metrics and was
+        // labelled with a quality verdict nothing had validated.
+        avgPercentile: null,
         strand: {
           cohortLabel: `${peerLabel} · ≥20 GP · ${SEASON.replaySeason}`,
           primary: cardStrandProfile(player, cohort),
@@ -330,7 +352,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
     }
   }, [
     player, teamName, roles, xnav, fmv, verdict, surplusWord, surplusTone, navLabel, navLongLabel,
-    publicGravity, edgeCells, percentiles, navCells, peerLabel, avgPercentile, exporting,
+    publicGravity, edgeCells, percentiles, navCells, peerLabel, exporting,
     allPlayers, compareSelection,
   ]);
 
@@ -338,7 +360,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
     <div style={{ width: "100%", maxWidth: 620, margin: "0 auto" }}>
       <div ref={cardRef} className="pcard" role="group"
         style={{ background: "#ede4cc" }}
-        aria-label={`${player.name} value card — ${navLabel} ${navLabelForDisplay(xnav)}${avgPercentile !== null ? `, ${percentileLabel(avgPercentile)} vs ${peerLabel}` : ""}`}>
+        aria-label={`${player.name} value card — ${navLabel} ${navLabelForDisplay(xnav)}, individual percentiles vs ${peerLabel}`}>
       <style>{`
         .pcard { width: 100%;
           /* A host's overflow-wrap: anywhere (the mobile detail sheet) also
@@ -503,6 +525,22 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       {/* Body: percentile table + value breakdown */}
       <div className="pcard-body">
         <div className="pcard-tablewrap">
+          {radarModel && (
+            <div role="group" aria-label="Percentile view" style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+              {([["bars", "Detailed values"], ["radar", "Radar (prototype)"]] as const).map(([id, label]) => (
+                <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)}
+                  style={{
+                    minHeight: 44, padding: "0 10px", fontFamily: "inherit", fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.08em",
+                    border: `${view === id ? 3 : 1}px solid #1c140a`, background: view === id ? "#e4d8b8" : "#f6efd9", color: "#1c140a", cursor: "pointer",
+                  }}>
+                  {view === id ? "✓ " : ""}{label}
+                </button>
+              ))}
+            </div>
+          )}
+          {radarModel && view === "radar" ? (
+            <PercentileRadar model={radarModel} playerName={player.name} compareName={comparePlayer?.name} peerLabel={peerLabel} />
+          ) : (
           <table className="pcard-table">
             <caption>Percentiles vs {peerLabel} (≥20 GP)</caption>
             <thead>
@@ -523,7 +561,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
                     {stat.pct !== null ? (
                       <div className="pcard-barrow">
                         <div className="pcard-bar" role="img"
-                          aria-label={`${ordinal(stat.pct)} percentile — ${percentileLabel(stat.pct).toLowerCase()}`}>
+                          aria-label={`${ordinal(stat.pct)} percentile of ${peerLabel}`}>
                           <div className="pcard-fill" style={{ width: `${stat.pct}%`, background: percentileColor(stat.pct) }} />
                           <div className="pcard-median" />
                         </div>
@@ -539,6 +577,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
               ))}
             </tbody>
           </table>
+          )}
         </div>
 
         <div className="pcard-side">
@@ -560,9 +599,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       <div className="pcard-foot">
         <span style={{ fontWeight: 900, color: INK }}>CAP & CREASE</span>
         <span>
-          {avgPercentile !== null
-            ? `${percentileLabel(avgPercentile)} · avg ${ordinal(avgPercentile)} pct vs ${peerLabel}`
-            : `vs ${peerLabel}`}
+          Individual percentiles vs {peerLabel} · not combined into one rating
         </span>
       </div>
       </div>
