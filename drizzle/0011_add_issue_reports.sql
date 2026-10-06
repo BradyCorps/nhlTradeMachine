@@ -13,4 +13,5 @@ CREATE TABLE issue_reports (
   status TEXT NOT NULL DEFAULT 'New' CHECK (status IN ('New', 'Investigating', 'Resolved', 'Dismissed')),
   internal_note TEXT NOT NULL DEFAULT ''
 );
+--> statement-breakpoint
 CREATE INDEX idx_issue_reports_created ON issue_reports(created_at DESC, id DESC);

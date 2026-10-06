@@ -20,6 +20,8 @@ Smallest follow-up: supply an operator-owned private object bucket and server-on
 
 Migration `0011_add_issue_reports.sql` adds only `issue_reports` and its newest-first index. It is appended to the existing Drizzle journal. There is no runtime CREATE TABLE or automatic Production migration. Existing migration hashes and historical snapshot definitions are unchanged; upgrade tests check snapshot preservation while applying the appended journal entry.
 
+The first remote Production attempt rolled back with `SQL_MANY_STATEMENTS`: the table and index commands lacked a Drizzle statement breakpoint. The 2026-10-06 correction separates those commands without changing the schema; only the still-unapplied 0011 source hash changes. Isolated tests run the actual journaled runner against the prior journal, upgrade once, preserve existing snapshot contents and journal entries, and verify a no-op rerun. Refresh valid secure operator Admin authentication before resuming Production migration and report-lifecycle verification.
+
 After review and separate rollout authorization:
 
 1. Inspect `npm run db:migration-status` with `MIGRATION_TARGET=production`, `MIGRATION_DATABASE_URL` and `MIGRATION_DATABASE_AUTH_TOKEN` supplied privately through the established operator environment. Confirm the existing journal is compatible and the only new pending migration is 0011.
