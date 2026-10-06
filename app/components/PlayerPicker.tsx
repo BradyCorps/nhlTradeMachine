@@ -13,7 +13,7 @@ const MAX_SHOWN = 40;
 const faint = "var(--ledger-ink-faint)";
 const rule = "var(--ledger-rule)";
 
-export default function PlayerPicker({ label, options, excluded = [], value, onChange, rule: ruleText }: {
+export default function PlayerPicker({ label, options, excluded = [], value, onChange, rule: ruleText, onQueryChange, disabled = false, placeholder, hideCount = false }: {
   label: string;
   options: ComparePeerOption[];
   excluded?: ExcludedPlayer[];
@@ -21,6 +21,13 @@ export default function PlayerPicker({ label, options, excluded = [], value, onC
   onChange: (id: string) => void;
   /** Eligibility rule, shown under the field. */
   rule?: string;
+  /** Called with the typed text, so a caller can highlight matches elsewhere. */
+  onQueryChange?: (query: string) => void;
+  /** Blocks typing and opening (e.g. a selection limit was reached). */
+  disabled?: boolean;
+  placeholder?: string;
+  /** Skip the trailing "N eligible" count in the hint. */
+  hideCount?: boolean;
 }) {
   const uid = useId().replace(/:/g, "");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -43,7 +50,8 @@ export default function PlayerPicker({ label, options, excluded = [], value, onC
   const listId = `${uid}-list`;
   const optId = (i: number) => `${uid}-opt-${i}`;
 
-  const choose = (id: string) => { onChange(id); setQuery(""); setOpen(false); inputRef.current?.focus(); };
+  const setQ = (q: string) => { setQuery(q); onQueryChange?.(q); };
+  const choose = (id: string) => { onChange(id); setQ(""); setOpen(false); inputRef.current?.focus(); };
   const clamp = (i: number) => Math.max(0, Math.min(shown.length - 1, i));
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -52,7 +60,7 @@ export default function PlayerPicker({ label, options, excluded = [], value, onC
     else if (e.key === "Home" && open) { e.preventDefault(); setActive(0); }
     else if (e.key === "End" && open) { e.preventDefault(); setActive(clamp(shown.length - 1)); }
     else if (e.key === "Enter" && open && shown[active]) { e.preventDefault(); choose(shown[active].id); }
-    else if (e.key === "Escape") { if (open) { e.preventDefault(); setOpen(false); } else if (query) setQuery(""); }
+    else if (e.key === "Escape") { if (open) { e.preventDefault(); setOpen(false); } else if (query) setQ(""); }
   };
 
   return (
@@ -72,16 +80,17 @@ export default function PlayerPicker({ label, options, excluded = [], value, onC
           aria-describedby={`${uid}-hint`}
           autoComplete="off"
           value={open ? query : (selected?.name ?? query)}
-          placeholder={selected ? selected.name : "Search by name or team"}
+          disabled={disabled}
+          placeholder={selected ? selected.name : (placeholder ?? "Search by name or team")}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 120)}
-          onChange={e => { setQuery(e.target.value); setActive(0); setOpen(true); }}
+          onChange={e => { setQ(e.target.value); setActive(0); setOpen(true); }}
           onKeyDown={onKeyDown}
           className="flex-1 min-w-0 font-mono text-[12px] font-bold px-2 border rounded-none"
           style={{ minHeight: 44, background: "var(--paper-bg)", color: "var(--ledger-ink)", borderColor: rule }}
         />
         {selected && (
-          <button type="button" onClick={() => { onChange(""); setQuery(""); inputRef.current?.focus(); }}
+          <button type="button" onClick={() => { onChange(""); setQ(""); inputRef.current?.focus(); }}
             aria-label={`Clear comparison with ${selected.name}`}
             className="font-mono text-[12px] font-black px-3 border"
             style={{ minHeight: 44, minWidth: 44, background: "var(--paper-bg)", color: "var(--ledger-red)", borderColor: rule }}>
@@ -90,7 +99,7 @@ export default function PlayerPicker({ label, options, excluded = [], value, onC
         )}
       </div>
       <p id={`${uid}-hint`} className="mt-1 text-[9px] font-mono leading-relaxed" style={{ color: faint }}>
-        {ruleText} {options.length} eligible.
+        {ruleText}{hideCount ? "" : ` ${options.length} eligible.`}
       </p>
       {open && (
         <ul id={listId} role="listbox" aria-label={`${label} results`}
