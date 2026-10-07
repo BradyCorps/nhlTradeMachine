@@ -7,6 +7,7 @@ import { BRAND } from "@/app/lib/brand";
 import { BrandMark } from "@/app/components/BrandMark";
 import TrendingPlayers from "./components/TrendingPlayers";
 import { ReportIssueLink } from "./components/ReportIssueLink";
+import TonightsGames from "./components/TonightsGames";
 
 function Cell({
   href, lead = false, kicker, kickerColor, edition, title, body, lines, cta, ctaColor,
@@ -162,6 +163,10 @@ export default function WelcomePage() {
             </div>
           </div>
         </header>
+
+        <section aria-label="Tonight's NHL games" className="border-b px-5 py-4 sm:px-8 font-mono min-w-0" style={{ borderColor: "var(--rule)" }}>
+          <TonightsGames homeStrip />
+        </section>
 
         {/* ── Immediate actions ──────────────────────────────── */}
         <nav

@@ -11,6 +11,7 @@ import type { TeamSortKey } from "@/app/lib/team-sort-summary";
 export type TeamPhaseFilter = "ALL" | "Contender" | "Bubble" | "Retooling" | "Rebuilding" | "Tanking";
 /** The NAV chart's F/D/G/X split toggle — V-05's "selected metric". */
 export type TeamNavDim = "xnav" | "fNav" | "dNav" | "gNav";
+export type TeamsView = "analytics" | "games";
 
 export interface TeamsUrlState {
   sortKey: TeamSortKey;
@@ -18,6 +19,8 @@ export interface TeamsUrlState {
   expandedId: string | null;
   detailCollapsed: boolean;
   navDim: TeamNavDim;
+  view: TeamsView;
+  matchupId: number | null;
 }
 
 export const TEAMS_URL_DEFAULTS: TeamsUrlState = {
@@ -26,6 +29,8 @@ export const TEAMS_URL_DEFAULTS: TeamsUrlState = {
   expandedId: null,
   detailCollapsed: false,
   navDim: "xnav",
+  view: "analytics",
+  matchupId: null,
 };
 
 const VALID_SORT_KEYS: readonly TeamSortKey[] = [
@@ -41,12 +46,15 @@ export function parseTeamsUrlState(params: URLSearchParams): TeamsUrlState {
   const phase = params.get("phase");
   const expand = params.get("expand");
   const navDim = params.get("metric");
+  const matchup = params.get("game");
   return {
     sortKey: sort && (VALID_SORT_KEYS as string[]).includes(sort) ? (sort as TeamSortKey) : TEAMS_URL_DEFAULTS.sortKey,
     filterPhase: phase && (VALID_PHASES as string[]).includes(phase) ? (phase as TeamPhaseFilter) : TEAMS_URL_DEFAULTS.filterPhase,
     expandedId: expand && expand.trim() ? expand : TEAMS_URL_DEFAULTS.expandedId,
     detailCollapsed: params.get("collapsed") === "1",
     navDim: navDim && (VALID_NAV_DIMS as string[]).includes(navDim) ? (navDim as TeamNavDim) : TEAMS_URL_DEFAULTS.navDim,
+    view: params.get("view") === "games" ? "games" : "analytics",
+    matchupId: matchup && /^\d{10}$/.test(matchup) ? Number(matchup) : null,
   };
 }
 
@@ -63,5 +71,7 @@ export function buildTeamsUrlQuery(state: TeamsUrlState): string {
   if (state.expandedId) params.set("expand", state.expandedId);
   if (state.detailCollapsed) params.set("collapsed", "1");
   if (state.navDim !== TEAMS_URL_DEFAULTS.navDim) params.set("metric", state.navDim);
+  if (state.view === "games") params.set("view", "games");
+  if (state.matchupId) params.set("game", String(state.matchupId));
   return params.toString();
 }

@@ -28,8 +28,8 @@ export default function TeamsLoading() {
           </h1>
           <p className="mt-2 max-w-3xl text-[11px] leading-relaxed" style={{ color: "var(--ledger-ink-faint)" }}>
             {detailTeam
-              ? `${detailTeam.name} contention window, roster X-NAV, cap situation, Team DNA, EDGE profile, and projected lines.`
-              : "Compare all 32 franchises by contention window, roster X-NAV, cap space, Team DNA, EDGE profile, and projected lines."}
+              ? `${detailTeam.name} contention window, roster X-NAV, cap situation, Team DNA, EDGE profile, and model depth charts.`
+              : "Compare all 32 franchises by contention window, roster X-NAV, cap space, Team DNA, EDGE profile, and model depth charts."}
           </p>
         </header>
 
