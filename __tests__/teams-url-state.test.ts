@@ -15,6 +15,7 @@ describe("parseTeamsUrlState", () => {
     const params = new URLSearchParams("sort=capSpace&phase=Contender&expand=EDM&collapsed=1&metric=fNav");
     expect(parseTeamsUrlState(params)).toEqual({
       sortKey: "capSpace", filterPhase: "Contender", expandedId: "EDM", detailCollapsed: true, navDim: "fNav",
+      view: "analytics", matchupId: null,
     });
   });
 
@@ -54,8 +55,20 @@ describe("buildTeamsUrlQuery", () => {
     const state = {
       sortKey: "speed" as const, filterPhase: "Rebuilding" as const,
       expandedId: "CHI", detailCollapsed: true, navDim: "gNav" as const,
+      view: "games" as const, matchupId: 2026020054,
     };
     expect(parseTeamsUrlState(new URLSearchParams(buildTeamsUrlQuery(state)))).toEqual(state);
+  });
+
+  it("retains the home-page game deep link while sorting and filtering", () => {
+    const state = parseTeamsUrlState(new URLSearchParams("view=games&game=2026020054&sort=capSpace"));
+    const restored = parseTeamsUrlState(new URLSearchParams(buildTeamsUrlQuery(state)));
+    expect(restored).toMatchObject({ view: "games", matchupId: 2026020054, sortKey: "capSpace" });
+  });
+
+  it("recovers from invalid views and malformed game ids", () => {
+    expect(parseTeamsUrlState(new URLSearchParams("view=unknown&game=-1"))).toMatchObject({ view: "analytics", matchupId: null });
+    expect(parseTeamsUrlState(new URLSearchParams("view=games&game=2026020054oops")).matchupId).toBeNull();
   });
 });
 

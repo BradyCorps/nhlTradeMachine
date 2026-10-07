@@ -16,7 +16,7 @@ export const PUBLIC_ROUTE_SEO = {
   teams: {
     path: "/teams",
     title: `NHL Team Analytics — ${BRAND.name}`,
-    description: "Compare all 32 NHL teams by contention window, roster X-NAV, cap space, Team DNA, EDGE profile, and projected lines.",
+    description: "Compare all 32 NHL teams by contention window, roster X-NAV, cap space, Team DNA, EDGE profile, and model depth charts.",
   },
   fantasy: {
     path: "/fantasy",
@@ -77,6 +77,6 @@ export function teamDetailSeo(team: { id: string; name: string }): PublicRouteSe
   return {
     path: `/teams/${team.id.toLowerCase()}`,
     title: `${team.name} Team Analytics — ${BRAND.name}`,
-    description: `${team.name} contention window, roster X-NAV, cap situation, Team DNA, EDGE profile, and projected lines.`,
+    description: `${team.name} contention window, roster X-NAV, cap situation, Team DNA, EDGE profile, and model depth charts.`,
   };
 }

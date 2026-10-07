@@ -31,6 +31,7 @@ import GravityField from "@/app/components/GravityField";
 import TeamNavChart from "@/app/components/TeamNavChart";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 import TeamsLoading from "./loading";
+import TonightsGames from "@/app/components/TonightsGames";
 import { playerCountLabel } from "@/app/lib/player-terminology";
 import { DataContextRail } from "@/app/components/DataContextRail";
 import type { LeagueProvenance } from "@/app/lib/data-context";
@@ -416,15 +417,15 @@ function LinePlayerLink({ player, detail, selection = DEFAULT_OBSERVED_SELECTION
 }
 
 function LineupSection({ lines, selection }: { lines: TeamLines; selection?: ObservedSelection }) {
-  const LINE_NAMES = ["1st Line", "2nd Line", "3rd Line", "4th Line"];
-  const PAIR_NAMES = ["1st Pair", "2nd Pair", "3rd Pair"];
+  const LINE_NAMES = ["Forward group 1", "Forward group 2", "Forward group 3", "Forward group 4"];
+  const PAIR_NAMES = ["Defense group 1", "Defense group 2", "Defense group 3"];
 
   return (
     <div>
       <div className="text-[9px] font-black uppercase tracking-[0.15em] mb-2" style={{ color: "var(--ledger-ink-faint)" }}>
-        Projected Lines
+        Model depth chart
       </div>
-      <p className="text-[11px] mb-2">Projection from available model inputs: up to 12 forwards, 6 defenders and 2 goalies. This is not the full roster or a confirmed lineup.</p>
+      <p className="text-[11px] mb-2">Model ranking using 2025–26 production, ice time and role inputs, applied to the current roster. Up to 12 forwards, 6 defenders and 2 goalies are grouped here. These are model groups, not reported game-day lines; injuries, scratches and tonight&apos;s starting goalie are not verified.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* Forwards */}
         <div>
@@ -469,7 +470,7 @@ function LineupSection({ lines, selection }: { lines: TeamLines; selection?: Obs
             </div>
             <div className="flex flex-wrap gap-x-3">
               {lines.goalies.map((g, i) => (
-                <LinePlayerLink selection={selection} key={g.id} player={g} detail={i === 0 ? "Starter" : "Backup"} />
+                <LinePlayerLink selection={selection} key={g.id} player={g} detail={`Model rank ${i + 1}`} />
               ))}
             </div>
           </div>
@@ -945,6 +946,8 @@ export default function TeamsPage() {
   const [detailCollapsed, setDetailCollapsed] = useState(initialUrlState.detailCollapsed);
   const [filterPhase, setFilterPhase] = useState<TeamPhaseFilter>(initialUrlState.filterPhase);
   const [navDim, setNavDim] = useState<TeamNavDim>(initialUrlState.navDim);
+  const [view, setView] = useState(initialUrlState.view);
+  const [matchupId, setMatchupId] = useState(initialUrlState.matchupId);
 
   useEffect(() => {
     if (!selectionReady) return;
@@ -983,13 +986,13 @@ export default function TeamsPage() {
   // is being viewed is the path, not touched here.
   useEffect(() => {
     if (!selectionReady) return;
-    const query = buildTeamsUrlQuery({ sortKey, filterPhase, expandedId, detailCollapsed, navDim });
+    const query = buildTeamsUrlQuery({ sortKey, filterPhase, expandedId, detailCollapsed, navDim, view, matchupId });
     const params = new URLSearchParams(query);
     params.set("season", selection.season);
     params.set("gameType", String(selection.gameType));
     const newUrl = `${window.location.pathname}?${params}`;
     window.history.replaceState(window.history.state, "", newUrl);
-  }, [sortKey, filterPhase, expandedId, detailCollapsed, navDim, selection.season, selection.gameType, selectionReady]);
+  }, [sortKey, filterPhase, expandedId, detailCollapsed, navDim, view, matchupId, selection.season, selection.gameType, selectionReady]);
 
   // A stale/hand-edited expanded-team id must recover safely rather than
   // leaving the index view expanding nothing.
@@ -1164,7 +1167,7 @@ export default function TeamsPage() {
     ? teamProfiles.find((profile) => profile.team.id.toUpperCase() === detailTeamId) ?? null
     : null;
 
-  if (loading) {
+  if (!selectionReady || (loading && (detailTeamId || view === "analytics"))) {
     return <TeamsLoading />;
   }
 
@@ -1194,7 +1197,7 @@ export default function TeamsPage() {
               {detailProfile?.team.name ?? detailTeamId}
             </h1>
             <p className="text-[11px] mt-1 leading-relaxed" style={{ color: "var(--ledger-ink-faint)" }}>
-              Team detail — contention window, roster NAV, cap situation, Team DNA, EDGE profile, and projected lines.
+              Team detail — contention window, roster NAV, cap situation, Team DNA, EDGE profile, and model depth chart.
             </p>
           </div>
 
@@ -1228,13 +1231,13 @@ export default function TeamsPage() {
       <div className="mx-auto max-w-6xl px-4 pt-5 pb-8">
         <Header activeTab="teams" />
 
-        <div className="mt-3">
+        {view === "analytics" && <div className="mt-3">
           <ObservedSeasonSelector selection={selection} onChange={setSelection} />
             <p className="text-[11px] mb-2">Records: {observedLabel(selection)}. Missing or delayed coverage is unavailable, not zero games.</p>
             <p className="text-[11px] mb-2">Current roster, contracts and NAV · model inputs, phases, Team DNA, EDGE profile and comparisons: 2025–26 regular season. These are not historical valuations.</p>
             {loadError && <p role="alert">{loadError}</p>}
             <DataContextRail route="teams" provenance={provenance} capCeiling={capCeiling} observedSelection={selection} />
-        </div>
+        </div>}
 
         {/* Page header */}
         <div className="mt-6 mb-5 border-b pb-4" style={{ borderColor: "var(--ledger-rule)" }}>
@@ -1245,10 +1248,31 @@ export default function TeamsPage() {
             NHL Team Analytics
           </h1>
           <p className="text-[11px] mt-1 leading-relaxed" style={{ color: "var(--ledger-ink-faint)" }}>
-            All 32 franchises — contention window, team DNA, EDGE profile, projected lines, and cap situation.
+            Tonight&apos;s matchups and all 32 franchises — team DNA, roster value, model depth charts, and cap situation.
           </p>
         </div>
 
+        <div role="group" aria-label="Teams views" className="flex flex-wrap gap-2 mb-5">
+          {([["analytics", "Team analytics"], ["games", "Tonight's games"]] as const).map(([key, label]) => (
+            <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)} className="min-h-11 border px-4 text-[11px] font-black"
+              style={{ borderColor: view === key ? "var(--ledger-red)" : "var(--ledger-rule)", background: view === key ? "var(--ledger-red)" : "transparent", color: view === key ? "#fff" : "var(--ledger-ink)" }}>{label}</button>
+          ))}
+        </div>
+
+        {view === "games" ? (
+          <TonightsGames
+            teams={teamProfiles.map(tp => ({
+              id: tp.team.id,
+              name: tp.team.name,
+              rosterNAV: tp.roster.length ? tp.rosterNAV : null,
+              capSpace: tp.team.capSpace,
+              present: tp.roster.length ? tp.contention.present : null,
+              future: tp.roster.length ? tp.contention.future : null,
+            }))}
+            matchupId={matchupId}
+            onMatchupChange={setMatchupId}
+          />
+        ) : <>
         {/* League overview strip */}
         <CompactFilters count={`${filtered.length} teams`} chips={filterPhase === "ALL" ? [] : [{ label: filterPhase, clear: () => setFilterPhase("ALL") }]}>
         <div
@@ -1411,6 +1435,7 @@ export default function TeamsPage() {
             No teams match the current filter.
           </div>
         )}
+        </>}
 
         <Footer />
       </div>
