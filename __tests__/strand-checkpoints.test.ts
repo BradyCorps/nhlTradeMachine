@@ -4,7 +4,7 @@ import { readMigrationFiles } from "drizzle-orm/migrator";
 import { beforeEach, describe, expect, it } from "vitest";
 import * as schema from "../app/db/schema";
 import { captureStrandCheckpoints, cohortMinGpFor, inputsFromSources, readStoredCheckpoints } from "../app/lib/strand-checkpoints.server";
-import { buildEvolutionView } from "../app/lib/strand-evolution";
+import { buildEvolutionView, traitValues, EDGE_EVOLUTION_WITHHELD_REASON, EVOLUTION_DEFINITION_VERSION } from "../app/lib/strand-evolution";
 
 const SEASON = "20262027";
 const migration = readMigrationFiles({ migrationsFolder: "drizzle" }).find(m => m.sql.join("").includes("strand_checkpoints"))!;
@@ -151,6 +151,37 @@ describe("capture", () => {
     const missing = JSON.parse(r.missing_json as string);
     expect(missing.sog_gp).toMatch(/EDGE sample is 9 GP but the NHL summary says 12 GP/);
     expect(missing.pts_gp).toBeUndefined();
+  });
+
+  it("preserves aligned raw EDGE inputs but withholds evolution values and cohort percentiles", async () => {
+    await captureStrandCheckpoints(db as any, args());
+    const stored = (await readStoredCheckpoints(db as any, 100, SEASON, 2))[0];
+    expect(stored.inputs).toMatchObject({ edgeGp: 12, edgeShotsAll: 22, edgeHdShots: 5, edgeOzPct: 0.5 });
+    const traits = traitValues(stored.inputs);
+    expect(traits.pts_gp.value).toBeCloseTo(0.5);
+    expect(traits.toi_gp.value).toBeCloseTo(1180 / 60);
+    for (const key of ["sog_gp", "hd_sog_gp", "oz_time"] as const) {
+      expect(traits[key]).toMatchObject({ value: null, missing: EDGE_EVOLUTION_WITHHELD_REASON });
+      expect(stored.cohort?.values[key]).toEqual([]);
+    }
+    expect(stored.cohort?.definitionVersion).toBe(EVOLUTION_DEFINITION_VERSION);
+    const raw = JSON.parse((await client.execute("SELECT inputs_json FROM strand_checkpoints WHERE player_id=100")).rows[0].inputs_json as string);
+    expect(raw.edgeShotsAll).toBe(22);
+    expect(JSON.parse((await client.execute("SELECT missing_json FROM strand_checkpoints WHERE player_id=100")).rows[0].missing_json as string).hd_sog_gp)
+      .toBe(EDGE_EVOLUTION_WITHHELD_REASON);
+  });
+
+  it("withholds EDGE values from older stored rows without rewriting their raw inputs", async () => {
+    const legacyInputs = { gp: 12, points: 6, toiSecondsPerGame: 1423.6666, edgeGp: 12, edgeShotsAll: 30, edgeHdShots: 8, edgeOzPct: 0.5 };
+    await db.insert(schema.strandCheckpoints).values({
+      id: "legacy", playerId: 100, season: SEASON, gameType: 2, milestone: "10", revision: 0,
+      status: "observed", observedGp: 12, posGroup: "F", capturedAt: 1_000, definitionVersion: "strand-evo-v1",
+      inputsJson: JSON.stringify(legacyInputs), missingJson: "{}", provenanceJson: "{}", contentHash: "legacy",
+    });
+    const stored = (await readStoredCheckpoints(db as any, 100, SEASON, 2))[0];
+    expect(traitValues(stored.inputs).hd_sog_gp).toMatchObject({ value: null, missing: EDGE_EVOLUTION_WITHHELD_REASON });
+    expect(traitValues(stored.inputs).toi_gp.value).toBeCloseTo(1423.6666 / 60);
+    expect(JSON.parse((await client.execute("SELECT inputs_json FROM strand_checkpoints WHERE id='legacy'")).rows[0].inputs_json as string)).toEqual(legacyInputs);
   });
 
   it("reads inputs defensively from partial sources", () => {

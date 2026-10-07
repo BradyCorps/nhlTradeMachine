@@ -1,12 +1,11 @@
 // ── verify-strand-evolution-sources.ts ───────────────────────────
 //
 // Read-only probe: confirms the NHL summary and EDGE feeds still match what the
-// Season profile evolution panel assumes (field names, whole-second ice time,
+// Season profile evolution panel assumes (field names, seconds-per-game ice time,
 // 0–1 zone-time fraction, shot counts, games alignment, available timestamps).
 //
-// The environment this feature was built in cannot reach the NHL, so this has
-// NOT been run against the live feeds. Run it where the NHL is reachable and
-// paste the output into the PR before merging:
+// A live Codespace probe passed on 2026-10-07. Repeat near rollout and inspect
+// source semantics separately; a pass alone does not verify every definition:
 //
 //   npx tsx scripts/verify-strand-evolution-sources.ts                       # 2026-27, Perfetti + a few
 //   npx tsx scripts/verify-strand-evolution-sources.ts 20252026 8482149 8478402
@@ -36,12 +35,12 @@ async function main() {
   for (const id of ids) {
     const r = await fetchJsonWithStatus(EDGE_URL(id, season, 2));
     console.log(`EDGE ${id}: HTTP ${r.status}`);
-    if (r.status === 200) edgeBodies.set(id, r.data);
+    edgeBodies.set(id, r.status === 200 ? r.data : null);
     if (dump && r.data) console.log(JSON.stringify(r.data, null, 2).slice(0, 4000));
   }
-  const { checks, ok } = checkEvolutionSources({ summaryRows: rows, edgeBodies });
+  const { checks, ok } = checkEvolutionSources({ summaryRows: rows, edgeBodies, expectedPlayerIds: ids });
   for (const c of checks) console.log(`${c.status.toUpperCase().padEnd(4)} ${c.name} — ${c.detail}`);
-  console.log(ok ? "\nAll hard checks passed." : "\nAt least one check FAILED; do not rely on the panel until resolved.");
+  console.log(ok ? "\nAll hard checks passed. This does not establish shot definitions or source freshness; see the rollout document." : "\nAt least one check FAILED; do not rely on the panel until resolved.");
   process.exit(ok ? 0 : 1);
 }
 void main();

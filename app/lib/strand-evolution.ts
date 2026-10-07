@@ -22,7 +22,8 @@
 
 import { metricPercentile } from "@/app/lib/strand-metrics";
 
-export const EVOLUTION_DEFINITION_VERSION = "strand-evo-v1";
+export const EVOLUTION_DEFINITION_VERSION = "strand-evo-v2-summary";
+export const EDGE_EVOLUTION_WITHHELD_REASON = "NHL EDGE source definition and freshness are not fully verified; evolution values withheld.";
 
 // ── Traits ───────────────────────────────────────────────────────
 
@@ -101,6 +102,8 @@ export interface CheckpointInputs {
   edgeHdShots: number | null;
   /** Fraction 0-1. */
   edgeOzPct: number | null;
+  /** Production sources preserve raw EDGE inputs while withholding unverified metrics. */
+  edgeWithheldReason?: string;
 }
 
 export const EMPTY_INPUTS: CheckpointInputs = {
@@ -122,7 +125,7 @@ const fin = (v: unknown): v is number => typeof v === "number" && Number.isFinit
 // were expected, a percentage where a fraction was), not to judge a player: a
 // value outside them is reported as missing with the reason, never clamped.
 export const PLAUSIBLE = {
-  toiSecondsPerGame: [60, 3600],   // 1 to 60 minutes; the NHL summary reports whole seconds
+  toiSecondsPerGame: [60, 3600],   // 1 to 60 minutes; seconds per game can be fractional
   pointsPerGame: [0, 5],
   shotsPerGame: [0, 20],
 } as const;
@@ -134,32 +137,34 @@ export function traitValues(i: CheckpointInputs): Record<TraitKey, TraitValue> {
   const edgeAligned = gpOk && fin(i.edgeGp) && i.edgeGp === i.gp;
   const edgeWhy = !fin(i.edgeGp) ? "no EDGE sample"
     : !gpOk ? noGp
-    : `EDGE sample is ${i.edgeGp} GP but the NHL summary says ${i.gp} GP; not combined`;
+    : !edgeAligned ? `EDGE sample is ${i.edgeGp} GP but the NHL summary says ${i.gp} GP; not combined`
+    : i.edgeWithheldReason ?? "";
+  const edgeReady = edgeAligned && !i.edgeWithheldReason;
   const none = (missing: string): TraitValue => ({ value: null, exposure: "—", missing });
   const gp = i.gp as number;
 
   const pointsOk = gpOk && fin(i.points) && i.points >= 0;
   const toiOk = gpOk && fin(i.toiSecondsPerGame);
-  const shotsOk = edgeAligned && fin(i.edgeShotsAll) && i.edgeShotsAll >= 0;
-  const hdOk = edgeAligned && fin(i.edgeHdShots) && i.edgeHdShots >= 0;
+  const shotsOk = edgeReady && fin(i.edgeShotsAll) && i.edgeShotsAll >= 0;
+  const hdOk = edgeReady && fin(i.edgeHdShots) && i.edgeHdShots >= 0;
 
   return {
     pts_gp: !pointsOk ? none(!gpOk ? noGp : "points not reported")
       : !within(i.points! / gp, PLAUSIBLE.pointsPerGame) ? none("points per game outside the plausible range; unit check failed")
       : { value: i.points! / gp, exposure: `${i.points} pts in ${gp} GP`, missing: null },
     toi_gp: !toiOk ? none(!gpOk ? noGp : "ice time not reported")
-      : !within(i.toiSecondsPerGame!, PLAUSIBLE.toiSecondsPerGame) ? none("ice time outside 1–60 minutes per game; expected whole seconds, unit check failed")
+      : !within(i.toiSecondsPerGame!, PLAUSIBLE.toiSecondsPerGame) ? none("ice time outside 1–60 minutes per game; expected seconds per game, unit check failed")
       : { value: i.toiSecondsPerGame! / 60, exposure: `${gp} GP · about ${Math.round(i.toiSecondsPerGame! * gp / 60)} min`, missing: null },
-    sog_gp: !shotsOk ? none(edgeAligned ? "shot count not reported" : edgeWhy)
+    sog_gp: !shotsOk ? none(edgeReady ? "shot count not reported" : edgeWhy)
       : !within(i.edgeShotsAll! / gp, PLAUSIBLE.shotsPerGame) ? none("shots per game outside the plausible range; unit check failed")
       : { value: i.edgeShotsAll! / gp, exposure: `${i.edgeShotsAll} shots in ${gp} GP`, missing: null },
-    hd_sog_gp: !hdOk ? none(edgeAligned ? "high-danger shot count not reported" : edgeWhy)
+    hd_sog_gp: !hdOk ? none(edgeReady ? "high-danger shot count not reported" : edgeWhy)
       : fin(i.edgeShotsAll) && i.edgeHdShots! > i.edgeShotsAll ? none("high-danger shots exceed all shots; inconsistent EDGE row")
       : !within(i.edgeHdShots! / gp, PLAUSIBLE.shotsPerGame) ? none("high-danger shots per game outside the plausible range; unit check failed")
       : { value: i.edgeHdShots! / gp, exposure: `${i.edgeHdShots} high-danger shots in ${gp} GP`, missing: null },
-    oz_time: edgeAligned && fin(i.edgeOzPct) && i.edgeOzPct >= 0 && i.edgeOzPct <= 1
+    oz_time: edgeReady && fin(i.edgeOzPct) && i.edgeOzPct >= 0 && i.edgeOzPct <= 1
       ? { value: i.edgeOzPct * 100, exposure: `${gp} GP`, missing: null }
-      : none(edgeAligned ? "zone time not reported or not a 0–1 fraction" : edgeWhy),
+      : none(edgeReady ? "zone time not reported or not a 0–1 fraction" : edgeWhy),
   };
 }
 
@@ -456,7 +461,7 @@ export function buildEvolutionView(args: {
         caveat: sampleCaveat(earlier.gp, latest.gp),
         withheldNotes: withheld,
         revisionNote: c.revision > 0 ? `Source correction: revision ${c.revision}. The original capture is retained.` : null,
-        provenanceNote: `${c.status === "observed" ? "Observed at capture" : "Reconstructed from dated source inputs"} · captured ${new Date(c.capturedAt).toISOString().slice(0, 10)} · NHL feeds supply no as-of timestamp · definition ${EVOLUTION_DEFINITION_VERSION}`,
+        provenanceNote: `${c.status === "observed" ? "Observed at capture" : "Reconstructed from dated source inputs"} · captured ${new Date(c.capturedAt).toISOString().slice(0, 10)} · No aggregate source as-of timestamp verified · definition ${EVOLUTION_DEFINITION_VERSION}`,
       });
     }
   }

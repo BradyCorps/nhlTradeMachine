@@ -3,17 +3,16 @@
 // Pure checks that the NHL feeds the evolution panel reads still mean what the
 // code assumes. Unit-tested on fixtures; run against the real feeds by
 // `scripts/verify-strand-evolution-sources.ts` from a machine that can reach the
-// NHL. Passing fixtures proves the checker, NOT the feed: until the script has
-// been run live, the panel's inputs are unverified.
+// NHL. Passing fixtures proves the checker, NOT the feed. Passing live checks
+// still does not establish every source definition or freshness guarantee.
 //
 // Assumptions checked (each is something a wrong guess would silently corrupt):
 //   summary  playerId, gamesPlayed, points are numbers
-//            timeOnIcePerGame is WHOLE SECONDS (typical median 900–1200)
+//            timeOnIcePerGame is plausible seconds per game (fractions allowed)
 //   EDGE     player.id matches, player.gamesPlayed is a number
 //            sogSummary has "all" and "high" with integer `shots`; high ≤ all
 //            zoneTimeDetails.offensiveZonePctg is a 0–1 fraction
-//   joint    EDGE games equal summary games for the same player and moment —
-//            how often they differ is the evidence for how stale an EDGE row can be
+//   joint    report GP alignment; equal GP does not establish equal as-of time
 
 import { PLAUSIBLE } from "@/app/lib/strand-evolution";
 
@@ -31,6 +30,8 @@ export function checkEvolutionSources(input: {
   summaryRows: readonly Record<string, unknown>[];
   /** EDGE bodies keyed by player id (only players the caller fetched). */
   edgeBodies: ReadonlyMap<number, unknown>;
+  /** Every requested player must have a valid response, including failed fetches. */
+  expectedPlayerIds?: readonly number[];
 }): { checks: SourceCheck[]; ok: boolean } {
   const checks: SourceCheck[] = [];
   const add = (name: string, status: CheckStatus, detail: string) => checks.push({ name, status, detail });
@@ -44,7 +45,7 @@ export function checkEvolutionSources(input: {
   const toi = played.map(r => r.timeOnIcePerGame as number);
   const med = median(toi);
   const [lo, hi] = PLAUSIBLE.toiSecondsPerGame;
-  add("summary: timeOnIcePerGame is whole seconds", med != null && med >= 300 && med <= 1500 && toi.every(t => t >= lo && t <= hi) ? "pass" : "fail",
+  add("summary: timeOnIcePerGame is plausible seconds per game", med != null && med >= 300 && med <= 1500 && toi.every(t => t >= lo && t <= hi) ? "pass" : "fail",
     med == null ? "no rows with games" : `median ${Math.round(med)}, min ${Math.min(...toi)}, max ${Math.max(...toi)} (seconds expected: median 300–1500, all within ${lo}–${hi})`);
   const worstPpg = Math.max(0, ...played.map(r => (r.points as number) / (r.gamesPlayed as number)));
   add("summary: points per game plausible", worstPpg <= PLAUSIBLE.pointsPerGame[1] ? "pass" : "fail", `highest ${worstPpg.toFixed(2)} pts/GP`);
@@ -52,7 +53,11 @@ export function checkEvolutionSources(input: {
   // ── EDGE ───────────────────────────────────────────────────────
   const aligned: boolean[] = [];
   let edgeIdx = 0;
-  for (const [id, raw] of input.edgeBodies) {
+  const expected = [...new Set(input.expectedPlayerIds ?? input.edgeBodies.keys())];
+  add("EDGE: requested response coverage", expected.length > 0 && expected.every(id => input.edgeBodies.get(id) != null) ? "pass" : "fail",
+    `${expected.filter(id => input.edgeBodies.get(id) != null).length}/${expected.length} requested players returned a body`);
+  for (const id of expected) {
+    const raw = input.edgeBodies.get(id);
     edgeIdx++;
     const body = raw as Record<string, any> | null;
     const tag = `EDGE ${id}`;
@@ -62,7 +67,7 @@ export function checkEvolutionSources(input: {
     const sog: any[] = Array.isArray(body.sogSummary) ? body.sogSummary : [];
     const all = sog.find(s => s?.locationCode === "all"), high = sog.find(s => s?.locationCode === "high");
     const allShots = num(all?.shots), hdShots = num(high?.shots);
-    add(`${tag}: sogSummary all/high shots`, allShots != null && hdShots != null && Number.isInteger(allShots) && Number.isInteger(hdShots) && hdShots <= allShots ? "pass" : "fail",
+    add(`${tag}: sogSummary all/high shots`, allShots != null && hdShots != null && Number.isInteger(allShots) && Number.isInteger(hdShots) && hdShots >= 0 && hdShots <= allShots ? "pass" : "fail",
       `locationCodes ${JSON.stringify(sog.map(s => s?.locationCode))}; all=${allShots}, high=${hdShots}`);
     const oz = num(body.zoneTimeDetails?.offensiveZonePctg);
     add(`${tag}: offensiveZonePctg is a 0–1 fraction`, oz != null && oz >= 0 && oz <= 1 ? "pass" : "fail", `value ${JSON.stringify(body.zoneTimeDetails?.offensiveZonePctg)}`);
@@ -70,7 +75,7 @@ export function checkEvolutionSources(input: {
     const detailSum = details.reduce((t, d) => t + (num(d?.shots) ?? 0), 0);
     add(`${tag}: do sogDetails sum to the "all" shots?`, "info", `${detailSum} across ${details.length} areas vs all=${allShots} (a gap means some shots are outside the listed areas)`);
     const dateKeys = Object.keys(body).filter(k => /date|updated|asof|as_of|season/i.test(k));
-    add(`${tag}: any as-of field?`, "info", dateKeys.length ? `top-level keys: ${dateKeys.join(", ")}` : "none at the top level; capture time is the only timestamp available");
+    add(`${tag}: any as-of field?`, "info", dateKeys.length ? `top-level keys: ${dateKeys.join(", ")}; inspect nested keys separately` : "none at the top level; inspect nested keys before claiming no aggregate as-of timestamp");
     const summaryRow = rows.find(r => num(r.playerId) === id);
     if (summaryRow) {
       const same = num(summaryRow.gamesPlayed) === num(body.player?.gamesPlayed);

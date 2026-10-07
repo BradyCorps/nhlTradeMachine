@@ -27,7 +27,17 @@ describe("source checker (proves the checker, not the live feed)", () => {
   });
   it("fails ice time reported in minutes instead of seconds", () => {
     const minutes = rows.map(r => ({ ...r, timeOnIcePerGame: r.timeOnIcePerGame / 60 }));
-    expect(failing(run(minutes))).toContain("summary: timeOnIcePerGame is whole seconds");
+    expect(failing(run(minutes))).toContain("summary: timeOnIcePerGame is plausible seconds per game");
+  });
+  it("accepts fractional seconds per game from the real summary unit", () => {
+    expect(run(rows.map(r => ({ ...r, timeOnIcePerGame: 1423.6666 }))).ok).toBe(true);
+  });
+  it("fails missing requested responses, including an empty EDGE sample", () => {
+    const partial = checkEvolutionSources({ summaryRows: rows, edgeBodies: new Map([[8478402, edge()]]), expectedPlayerIds: [8478402, 8482149] });
+    expect(partial.ok).toBe(false);
+    expect(failing(partial)).toContain("EDGE 8482149: body");
+    expect(checkEvolutionSources({ summaryRows: rows, edgeBodies: new Map() }).ok).toBe(false);
+    expect(checkEvolutionSources({ summaryRows: rows, edgeBodies: new Map([[8478402, null]]), expectedPlayerIds: [8478402] }).ok).toBe(false);
   });
   it("fails a missing summary field and a percent-style zone share", () => {
     expect(failing(run(rows.map(({ points, ...r }) => r as never)))).toContain("summary: required fields");

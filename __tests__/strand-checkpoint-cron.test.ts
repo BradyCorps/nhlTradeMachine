@@ -1,11 +1,13 @@
 import { createClient, type Client } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import { readMigrationFiles } from "drizzle-orm/migrator";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ensureNhlSnapshotTable } from "../app/db/ensure-schema";
 import * as schema from "../app/db/schema";
-import { runStrandCheckpointCapture, MAX_WRITES } from "../app/lib/strand-checkpoint-cron.server";
-import { readStoredCheckpoints } from "../app/lib/strand-checkpoints.server";
+import { runStrandCheckpointCapture, MAX_WRITES, BUDGET_MS } from "../app/lib/strand-checkpoint-cron.server";
+import { captureStrandCheckpoints, readStoredCheckpoints } from "../app/lib/strand-checkpoints.server";
+import { checkpointBudget, CheckpointBudgetExceeded } from "../app/lib/strand-checkpoint-budget.server";
+import { captureGoalieEdgeDetail } from "../app/lib/goalie-edge";
 
 // Isolated database + injected NHL summary. Nothing here touches the network or Production.
 const SEASON = "20262027";
@@ -39,6 +41,7 @@ beforeEach(async () => {
   await ensureNhlSnapshotTable(holder.db);
   summaryMock.read.mockReset();
 });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 describe("checkpoint stage", () => {
   it("is off unless explicitly enabled, and then touches neither upstream nor database", async () => {
@@ -104,11 +107,135 @@ describe("checkpoint stage", () => {
     expect(await count()).toBe(MAX_WRITES + 50);
   });
 
+  it("captures deferred players before repeated earlier corrections, regardless of source order", async () => {
+    const big = league(12, MAX_WRITES + 1);
+    const run = (rows: any[]) => runStrandCheckpointCapture({ db: holder.db, env: ON, readSummary: (async () => available(rows)) as any, readEdge: noEdge as any });
+    expect((await run(big)).report).toMatchObject({ inserted: MAX_WRITES, deferred: 1 });
+    const deferredId = big[big.length - 1].playerId;
+    for (let revision = 1; revision <= 3; revision++) {
+      const corrected = big.map(r => r.playerId === deferredId ? r : { ...r, points: r.points + revision });
+      const result = await run(corrected.reverse());
+      if (revision === 1) expect(result.report).toMatchObject({ inserted: 1, corrected: MAX_WRITES - 1, deferred: 1 });
+      expect(await readStoredCheckpoints(holder.db, deferredId, SEASON, 2)).toHaveLength(1);
+    }
+  }, 15_000);
+
+  it("prioritizes a window near expiry over an earlier source row", async () => {
+    const report = await captureStrandCheckpoints(holder.db, {
+      season: SEASON, gameType: 2, summaryRows: [row(100, 10, 6), row(200, 15, 6)],
+      summaryRetrievedAt: 5_000, edgeByPlayer: new Map(), now: Date.now(), maxWrites: 1,
+    });
+    expect(report).toMatchObject({ inserted: 1, deferred: 1 });
+    expect(await readStoredCheckpoints(holder.db, 200, SEASON, 2)).toHaveLength(1);
+    expect(await readStoredCheckpoints(holder.db, 100, SEASON, 2)).toHaveLength(0);
+  });
+
+  it("skips all checkpoint work when the enclosing route budget is already exhausted", async () => {
+    const readSummary = vi.fn();
+    const out = await runStrandCheckpointCapture({ db: holder.db, env: ON, now: () => 100, deadlineMs: 100, readSummary: readSummary as any });
+    expect(out.status).toBe("budget-exhausted");
+    expect(readSummary).not.toHaveBeenCalled();
+  });
+
+  it.each(["summary", "edge", "checkpoint-read"])("bounds a hanging %s read without starting later work", async stage => {
+    vi.useFakeTimers();
+    let release!: (value: any) => void;
+    const hanging = new Promise<any>(resolve => { release = resolve; });
+    const readSummary = vi.fn(() => stage === "summary" ? hanging : Promise.resolve(available(league(12))));
+    const readEdge = vi.fn(() => stage === "edge" ? hanging : Promise.resolve(new Map()));
+    const insert = vi.spyOn(holder.db, "insert");
+    if (stage === "checkpoint-read") vi.spyOn(holder.db, "select").mockReturnValue({ from: () => ({ where: () => hanging }) });
+    const result = runStrandCheckpointCapture({ db: holder.db, env: ON, readSummary: readSummary as any, readEdge: readEdge as any });
+    await vi.advanceTimersByTimeAsync(BUDGET_MS);
+    expect((await result).status).toBe("budget-exhausted");
+    release(stage === "summary" ? available(league(12)) : stage === "edge" ? new Map() : []);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(insert).not.toHaveBeenCalled();
+    if (stage === "summary") expect(readEdge).not.toHaveBeenCalled();
+  });
+
+  it("does not start a checkpoint write when the cohort insert crosses the deadline", async () => {
+    let clock = 0;
+    const realInsert = holder.db.insert.bind(holder.db);
+    const insert = vi.spyOn(holder.db, "insert").mockImplementation((table: any) => ({
+      values: (values: any) => ({ onConflictDoNothing: () => ({ returning: async (fields: any) => {
+        const result = await realInsert(table).values(values).onConflictDoNothing().returning(fields);
+        clock = 10_000;
+        return result;
+      } }) }),
+    }));
+    const out = await runStrandCheckpointCapture({ db: holder.db, env: ON, now: () => clock, deadlineMs: 10_000,
+      readSummary: (async () => available(league(12))) as any, readEdge: noEdge as any });
+    expect(out.status).toBe("budget-exhausted");
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(await count("strand_reference_cohorts")).toBe(1);
+    expect(await count()).toBe(0);
+  });
+
+  it("reports a timed-out checkpoint write, starts no more writes, and safely retries a late commit", async () => {
+    vi.useFakeTimers();
+    const realInsert = holder.db.insert.bind(holder.db);
+    let release!: () => void;
+    let started!: () => void;
+    const writeStarted = new Promise<void>(resolve => { started = resolve; });
+    const pendingWrite = new Promise<void>(resolve => { release = resolve; });
+    const insert = vi.spyOn(holder.db, "insert").mockImplementation((table: any) => {
+      if (table !== schema.strandCheckpoints) return realInsert(table);
+      return { values: (values: any) => ({ onConflictDoNothing: () => ({ returning: async (fields: any) => {
+        started();
+        await pendingWrite;
+        return realInsert(table).values(values).onConflictDoNothing().returning(fields);
+      } }) }) };
+    });
+    const run = () => runStrandCheckpointCapture({ db: holder.db, env: ON,
+      readSummary: (async () => available(league(12, 2))) as any, readEdge: noEdge as any });
+    const first = run();
+    await writeStarted;
+    await vi.advanceTimersByTimeAsync(BUDGET_MS);
+    expect((await first).status).toBe("budget-exhausted");
+    expect(insert).toHaveBeenCalledTimes(2); // one cohort, one checkpoint
+    release();
+    vi.useRealTimers();
+    // Wait for the simulated remote commit, rather than assuming timeout cancelled it.
+    await vi.waitFor(async () => { expect(await count()).toBe(1); });
+    expect(insert).toHaveBeenCalledTimes(2);
+    insert.mockRestore();
+    expect((await run()).report).toMatchObject({ inserted: 1, unchanged: 1, deferred: 0 });
+    expect(await count()).toBe(2);
+  });
+
+  it("rejects operations after expiry without starting them", async () => {
+    let clock = 0;
+    const budget = checkpointBudget(100, () => clock);
+    clock = 100;
+    const operation = vi.fn(async () => 1);
+    await expect(budget.run(operation)).rejects.toBeInstanceOf(CheckpointBudgetExceeded);
+    expect(operation).not.toHaveBeenCalled();
+  });
+
   it("dry run counts and writes nothing", async () => {
     const out = await runStrandCheckpointCapture({ db: holder.db, env: ON, dryRun: true, readSummary: (async () => available(league(12))) as any, readEdge: noEdge as any });
     expect(out).toMatchObject({ status: "ok", dryRun: true, report: { inserted: 25 } });
     expect(await count()).toBe(0);
     expect(await count("strand_reference_cohorts")).toBe(0);
+  });
+
+  it("supports an authenticated route dry run while capture stays disabled", async () => {
+    vi.stubEnv("CRON_SECRET", "s3cret");
+    vi.stubEnv("STRAND_CHECKPOINT_CAPTURE", "0");
+    summaryMock.read.mockResolvedValue(available(league(12)));
+    const { GET } = await import("../app/api/cron/nhl-feed/route");
+    const url = "http://x/api/cron/nhl-feed?only=strand&strandDryRun=1";
+    expect((await GET(new Request(url))).status).toBe(401);
+    expect(summaryMock.read).not.toHaveBeenCalled();
+    const res = await GET(new Request(url, { headers: { authorization: "Bearer s3cret" } }));
+    expect(await res.json()).toMatchObject({ only: "strand", strandCheckpoints: { status: "ok", dryRun: true, report: { inserted: 25 } } });
+    expect(await count()).toBe(0);
+    expect(await count("strand_reference_cohorts")).toBe(0);
+    summaryMock.read.mockClear();
+    const off = await GET(new Request("http://x/api/cron/nhl-feed?only=strand", { headers: { authorization: "Bearer s3cret" } }));
+    expect(await off.json()).toMatchObject({ strandCheckpoints: { status: "disabled" } });
+    expect(summaryMock.read).not.toHaveBeenCalled();
   });
 
   it("keeps the missing-data reason and withholds EDGE when GP is not aligned", async () => {
@@ -167,6 +294,29 @@ describe("cron route integration", () => {
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body).toMatchObject({ ok: true, requested: 0, strandCheckpoints: { status: "failed" } });
+  });
+
+  it("preserves the feed response when preceding work uses the checkpoint allowance", async () => {
+    let clock = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => clock);
+    vi.mocked(captureGoalieEdgeDetail).mockImplementationOnce(async () => { clock = 55_000; return { ok: true } as any; });
+    const res = await call("http://x/api/cron/nhl-feed", { authorization: "Bearer s3cret" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, requested: 0, strandCheckpoints: { status: "budget-exhausted" } });
+    expect(summaryMock.read).not.toHaveBeenCalled();
+  });
+
+  it("returns the existing feed results when a checkpoint read hangs near the route deadline", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    vi.mocked(captureGoalieEdgeDetail).mockImplementationOnce(async () => { vi.setSystemTime(54_000); return { ok: true } as any; });
+    summaryMock.read.mockImplementation(() => new Promise(() => {}));
+    const response = call("http://x/api/cron/nhl-feed", { authorization: "Bearer s3cret" });
+    await vi.advanceTimersByTimeAsync(1_000);
+    const res = await response;
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, requested: 0, goalieDetail: { ok: true }, strandCheckpoints: { status: "budget-exhausted" } });
+    expect(Date.now()).toBe(55_000);
   });
 
   it("is a no-op stage when the flag is off, and only=strand skips the feed capture", async () => {

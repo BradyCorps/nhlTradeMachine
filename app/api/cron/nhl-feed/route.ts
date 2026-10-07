@@ -6,7 +6,7 @@ import { captureGoalieEdgeBoards, captureGoalieEdgeDetail } from "@/app/lib/goal
 import { activeGoalieIdsForTeams } from "@/app/lib/nhl-active-players";
 import { isAuthorized } from "@/app/lib/admin-auth";
 import { db } from "@/app/db/client";
-import { runStrandCheckpointCapture } from "@/app/lib/strand-checkpoint-cron.server";
+import { runStrandCheckpointCapture, RESPONSE_RESERVE_MS } from "@/app/lib/strand-checkpoint-cron.server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -15,6 +15,7 @@ export const maxDuration = 60;
 // Four teams per night, rotating on an 8-day cycle, so the whole league
 // lands in nhl_snapshots weekly-ish without ever busting one invocation.
 export async function GET(req: Request) {
+  const checkpointDeadlineMs = Date.now() + maxDuration * 1000 - RESPONSE_RESERVE_MS;
   const cronSecret = process.env.CRON_SECRET;
   const auth = req.headers.get("authorization");
   const cronOk = Boolean(cronSecret) && auth === `Bearer ${cronSecret}`;
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
   // manual retry); `?strandEnd=1` records the END checkpoint after the final game;
   // `?strandDryRun=1` counts what would be written and writes nothing.
   const params = new URL(req.url).searchParams;
-  const strandOptions = { seasonComplete: params.get("strandEnd") === "1", dryRun: params.get("strandDryRun") === "1" };
+  const strandOptions = { seasonComplete: params.get("strandEnd") === "1", dryRun: params.get("strandDryRun") === "1", deadlineMs: checkpointDeadlineMs };
   if (params.get("only") === "strand") {
     return NextResponse.json({ ok: true, only: "strand", strandCheckpoints: await runStrandCheckpointCapture({ db: db as any, ...strandOptions }) });
   }
@@ -54,7 +55,7 @@ export async function GET(req: Request) {
     { playerIds: activeGoalieIdsForTeams(group) },
   ).catch((e: any) => ({ error: String(e?.message ?? e) }));
 
-  // Last, so the existing captures keep their time budget; the stage bounds itself.
+  // Last, using only the remaining route time and reserving time for this response.
   const strandCheckpoints = await runStrandCheckpointCapture({ db: db as any, ...strandOptions });
 
   return NextResponse.json({ ok: true, cycleDay, teams: group, season, gameType: 2, goalieBoards, goalieDetail, strandCheckpoints, ...result });
