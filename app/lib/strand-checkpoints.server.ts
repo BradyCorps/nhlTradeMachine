@@ -2,11 +2,11 @@
 //
 // Capture and read immutable STRAND-evolution checkpoints.
 //
-// NOT WIRED TO ANYTHING. Nothing schedules `captureStrandCheckpoints`, no route
-// calls it, and the tables it writes exist only after migration 0012 is applied.
-// docs/strand-evolution-2026-10-06/README.md describes the future wiring. The
-// database is injected so tests run against an isolated file and so this module
-// never opens a connection of its own.
+// Called only by `strand-checkpoint-cron.server.ts` (the nightly NHL feed cron),
+// and only when STRAND_CHECKPOINT_CAPTURE=1; the tables it writes exist only after
+// migration 0012 is applied. See docs/strand-evolution-2026-10-06/README.md.
+// The database is injected so tests run against an isolated file and so this
+// module never opens a connection of its own.
 //
 // RULES (all tested)
 //   • Insert-only. Database triggers abort UPDATE and DELETE.
@@ -67,6 +67,12 @@ export interface CaptureArgs {
   seasonComplete?: boolean;
   /** Restrict to these players (e.g. tonight's rotation); the cohort still uses the whole league. */
   onlyPlayerIds?: ReadonlySet<number>;
+  /** Stop after this many new rows; the rest are picked up by the next run (capture is idempotent). */
+  maxWrites?: number;
+  /** Stop starting new writes after this epoch-ms instant. */
+  deadlineMs?: number;
+  /** Count what would be written without writing anything (no cohort or checkpoint rows). */
+  dryRun?: boolean;
 }
 
 export interface CaptureReport {
@@ -76,12 +82,14 @@ export interface CaptureReport {
   corrected: number;
   noMilestone: number;
   cohortsInserted: number;
+  /** Players in a window whose write was postponed by `maxWrites` / `deadlineMs`. */
+  deferred: number;
 }
 
 interface Existing { id: string; milestone: string; revision: number; observedGp: number; contentHash: string }
 
 export async function captureStrandCheckpoints(db: Db, a: CaptureArgs): Promise<CaptureReport> {
-  const report: CaptureReport = { considered: 0, inserted: 0, unchanged: 0, corrected: 0, noMilestone: 0, cohortsInserted: 0 };
+  const report: CaptureReport = { considered: 0, inserted: 0, unchanged: 0, corrected: 0, noMilestone: 0, cohortsInserted: 0, deferred: 0 };
   if (a.gameType !== 2) return report;
 
   const prior: Existing[] = await db.select({
@@ -113,6 +121,7 @@ export async function captureStrandCheckpoints(db: Db, a: CaptureArgs): Promise<
       players: league.filter(p => p.group === group).map(p => p.inputs),
       capturedAt: a.now, source: "NHL stats summary + latest stored NHL EDGE rows",
     });
+    if (a.dryRun) { cohorts.set(key, cohort); return cohort; }
     const written = await db.insert(strandReferenceCohorts).values({
       id: cohort.id, season: cohort.season, gameType: cohort.gameType, posGroup: cohort.posGroup,
       definitionVersion: cohort.definitionVersion, minGp: cohort.minGp, gpMin: cohort.gpMin, gpMax: cohort.gpMax, n: cohort.n,
@@ -144,7 +153,13 @@ export async function captureStrandCheckpoints(db: Db, a: CaptureArgs): Promise<
       definitionVersion: EVOLUTION_DEFINITION_VERSION, inputs: p.inputs,
     });
     if (stored && stored.contentHash === contentHash) { report.unchanged++; continue; }
+    // Bounded: out of budget means postpone, never drop. A later run records the player
+    // at its then-current GP if still inside the window, or leaves the milestone missing.
+    const budgetSpent = (a.maxWrites != null && report.inserted + report.corrected >= a.maxWrites)
+      || (a.deadlineMs != null && Date.now() > a.deadlineMs);
+    if (budgetSpent) { report.deferred++; continue; }
     const cohort = await cohortFor(m, p.group);
+    if (a.dryRun) { if (stored) report.corrected++; else report.inserted++; continue; }
     const missing = Object.fromEntries(TRAIT_KEYS.flatMap(k => { const t = traitValues(p.inputs)[k]; return t.missing ? [[k, t.missing]] : []; }));
     const revision = stored ? stored.revision + 1 : 0;
     const written = await db.insert(strandCheckpoints).values({

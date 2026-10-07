@@ -5,6 +5,8 @@ import { capturePlayerSnapshots, rosterPlayerIds } from "@/app/lib/nhl-feed-capt
 import { captureGoalieEdgeBoards, captureGoalieEdgeDetail } from "@/app/lib/goalie-edge";
 import { activeGoalieIdsForTeams } from "@/app/lib/nhl-active-players";
 import { isAuthorized } from "@/app/lib/admin-auth";
+import { db } from "@/app/db/client";
+import { runStrandCheckpointCapture } from "@/app/lib/strand-checkpoint-cron.server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -18,6 +20,16 @@ export async function GET(req: Request) {
   const cronOk = Boolean(cronSecret) && auth === `Bearer ${cronSecret}`;
   if (!cronOk && !(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Season profile evolution stage. It reports under its own key and can never fail
+  // the feed capture below. `?only=strand` runs just this stage (bounded first run /
+  // manual retry); `?strandEnd=1` records the END checkpoint after the final game;
+  // `?strandDryRun=1` counts what would be written and writes nothing.
+  const params = new URL(req.url).searchParams;
+  const strandOptions = { seasonComplete: params.get("strandEnd") === "1", dryRun: params.get("strandDryRun") === "1" };
+  if (params.get("only") === "strand") {
+    return NextResponse.json({ ok: true, only: "strand", strandCheckpoints: await runStrandCheckpointCapture({ db: db as any, ...strandOptions }) });
   }
 
   const teams = TEAMS_DB.map((t) => t.id).sort();
@@ -42,5 +54,8 @@ export async function GET(req: Request) {
     { playerIds: activeGoalieIdsForTeams(group) },
   ).catch((e: any) => ({ error: String(e?.message ?? e) }));
 
-  return NextResponse.json({ ok: true, cycleDay, teams: group, season, gameType: 2, goalieBoards, goalieDetail, ...result });
+  // Last, so the existing captures keep their time budget; the stage bounds itself.
+  const strandCheckpoints = await runStrandCheckpointCapture({ db: db as any, ...strandOptions });
+
+  return NextResponse.json({ ok: true, cycleDay, teams: group, season, gameType: 2, goalieBoards, goalieDetail, strandCheckpoints, ...result });
 }

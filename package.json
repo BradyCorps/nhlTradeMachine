@@ -16,6 +16,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migration-status": "tsx scripts/db-migration-status.ts",
     "db:migrate": "tsx scripts/db-migrate.ts",
+    "db:verify-strand-checkpoints": "tsx scripts/db-verify-strand-checkpoints.ts",
     "db:verify-season-snapshot-schema": "tsx scripts/db-verify-season-snapshot-schema.ts",
     "db:verify-labs-candidate-schema": "tsx scripts/db-verify-labs-candidate-schema.ts",
     "db:verify-labs-evaluation-schema": "tsx scripts/db-verify-labs-evaluation-schema.ts",

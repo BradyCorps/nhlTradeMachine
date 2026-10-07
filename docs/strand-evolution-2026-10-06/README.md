@@ -74,7 +74,7 @@ same dated capture. Production was not inspected.
 
 ## Source verification status
 
-**Not verified against the live feeds.** The build environment cannot reach `api.nhle.com` or `api-web.nhle.com`. What is established, and how:
+**Not verified against the live feeds. Re-attempted 2026-10-07: still blocked.** `api-web.nhle.com` and `api.nhle.com` both answer `CONNECT tunnel failed, response 403` from the build environment's egress proxy, so `scripts/verify-strand-evolution-sources.ts` could not run and no live findings exist. Nothing below is upgraded from "indirect" or "open". What is established, and how:
 
 | Assumption | Evidence | Status |
 |---|---|---|
@@ -86,7 +86,14 @@ same dated capture. Production was not inspected.
 | Any as-of timestamp in the payloads | none is read; capture time is the only timestamp used | **open** |
 | How far an EDGE row can lag the summary | unknown; the 8-day cron rotation implies days | **open** |
 
-To close them: run `npx tsx scripts/verify-strand-evolution-sources.ts` where the NHL is reachable and attach the output to the PR. It prints the field shapes, whole-second range, zone-time range, shot consistency, EDGE-vs-summary game alignment, and any as-of field. The checker behind it (`app/lib/strand-source-check.ts`) is unit-tested on fixtures; that proves the checker, not the feed.
+To close them, from a Codespace (read-only, writes nothing, needs no secrets):
+
+```
+npx tsx scripts/verify-strand-evolution-sources.ts            # 2026-27 regular season, four default players
+npx tsx scripts/verify-strand-evolution-sources.ts --dump     # also prints one raw EDGE outline
+```
+
+Exit code 1 means a hard check failed: do not enable capture. Attach the output to the PR. Passing hard checks does not settle the three "open" rows above (shot definition, `sogDetails` sum, as-of field); read the printed shapes and record the answers here. It prints the field shapes, whole-second range, zone-time range, shot consistency, EDGE-vs-summary game alignment, and any as-of field. The checker behind it (`app/lib/strand-source-check.ts`) is unit-tested on fixtures; that proves the checker, not the feed.
 
 The code also refuses to print a rate that fails a plausibility check (ice time outside 1-60 minutes, points over 5 per game, more than 20 shots per game, high-danger shots above all shots, zone share outside 0-1). It reports the value as missing with the reason. A silent unit error cannot become a rate.
 
@@ -120,18 +127,79 @@ Summary and EDGE are separate reads at separate times. Their totals are only com
   lasting change in ability.
 - Playoffs: unsupported (not equivalent to a regular-season baseline).
 
-## Rollout (not done here)
+## Capture wiring (implemented, off by default)
 
-1. Apply `drizzle/0012_add_strand_checkpoints.sql` through the journaled runner
-   (`scripts/db-migrate.ts`). Additive; creates two tables, two indexes, four triggers.
-   Until then the panel reads as "checkpoint store not available" and the page works.
-2. Wire `captureStrandCheckpoints(db, args)` (`app/lib/strand-checkpoints.server.ts`)
-   into the existing `/api/cron/nhl-feed` after `capturePlayerSnapshots`, with ONE league
-   summary request (`readObservedSummary`) and `latestStoredEdge` for the EDGE inputs.
-   No per-viewer capture and no extra upstream request per player. Nothing calls it today and
-   no scheduled write was added. Because the cron rotates 4 teams a night, run the capture
-   for the whole league from the shared summary (cheap) rather than only the night's teams,
-   or the 5-GP window can be missed.
-3. Call it with `seasonComplete: true` once after the final regular-season game.
-4. Production will first show checkpoints from the first window it observes; earlier
-   targets stay unavailable by design.
+`/api/cron/nhl-feed` (already authenticated by `CRON_SECRET`, an admin key or a signed admin session)
+now ends with `runStrandCheckpointCapture` (`app/lib/strand-checkpoint-cron.server.ts`). It runs last,
+reports under its own `strandCheckpoints` key, never throws, and cannot fail the existing feed capture.
+
+- **Switch:** `STRAND_CHECKPOINT_CAPTURE=1`. Anything else (including unset) returns `{status:"disabled"}`
+  without touching the NHL or the database. Environment changes take effect on the next deployment.
+- **Upstream cost:** none added. One shared league skater summary via `readObservedSummary` (the same
+  request and 5-minute cache the stat strip uses, one per night), plus a database read of EDGE rows the
+  existing snapshot capture already stored. No league-wide EDGE refresh, no per-player request, no per-viewer write.
+- **Idle nights:** if no skater is inside a milestone window (10/20/40/60 GP, up to 5 games over), the
+  stage reads nothing more and writes nothing (`idle: true`).
+- **Bounds:** at most 300 new rows and a 20-second budget per run. The rest is reported as `deferred`
+  and picked up next run; capture is idempotent, so a retry never duplicates. A deferred player is recorded
+  at their then-current GP if still in the window; otherwise that milestone stays missing (never back-filled).
+- **Statuses:** `disabled`, `ok`, `summary-unavailable`, `store-unavailable` (migration 0012 not applied),
+  `failed` (message included). Missing-data reasons are stored per row; EDGE traits stay withheld by the
+  alignment rule (EDGE games must equal summary games) and the coverage rule (at least half the cohort).
+  Expect most EDGE traits to be withheld until a league-wide aligned EDGE pull exists: the existing cron
+  refreshes four clubs a night.
+- **Manual controls (authenticated GET):** `?only=strand` runs just this stage; `&strandDryRun=1` counts
+  what would be written and writes nothing; `&strandEnd=1` records the END checkpoint after the final
+  regular-season game. The schedule never sets `strandEnd`.
+
+Isolated tests (`__tests__/strand-checkpoint-cron.test.ts`, against a disposable migrated libSQL file
+and the real route handler with stubbed upstream) cover: unauthenticated rejection before any work,
+disabled flag, exactly one summary request, duplicate retries, source-correction revisions (original kept),
+milestone windows, write bounds and resumption, dry run, idle nights, failure isolation for each status,
+and untouched neighbouring tables. The real journaled runner was also run from an empty database
+(0006→0012 applied, rerun a no-op) with `db:verify-strand-checkpoints`.
+
+## Expected costs (estimates, not measurements)
+
+- **Upstream:** 1 summary request per cron run (roughly 900 skater rows). Nothing else.
+- **Database reads:** idle nights, none beyond the summary. In a window, one scan of stored EDGE rows (about
+  one per skater) and one query of this season's checkpoints.
+- **Database writes:** at most ~900 checkpoint rows per milestone, 4 milestones plus END, so about 4,500 rows
+  a season at roughly 1-1.5 KB each (a few MB), spread over several nights by the 300-row bound. Reference
+  cohorts are content-addressed; a cohort is stored only when a checkpoint pinned to it is, one per position
+  group per night inside a window, at tens of KB each: low single-digit MB a season.
+- **Page reads:** unchanged; the dossier reads stored rows for one player.
+
+## Rollout (not done; each step needs an operator)
+
+Prerequisite: PR merged and deployed with `STRAND_CHECKPOINT_CAPTURE` unset. The panel then reads
+"checkpoint store not available" and the page is otherwise unchanged.
+
+1. **Source check (Codespace):** run the command in "Source verification status". Stop if exit code is 1.
+2. **Migration status.** Supply `MIGRATION_TARGET=production`, `MIGRATION_DATABASE_URL`,
+   `MIGRATION_DATABASE_AUTH_TOKEN` privately (never in command text or files):
+   `npm run db:migration-status`. Confirm the journal is compatible. Pending must be 0012 alone; if 0011
+   (issue reports) is also pending, `db:migrate` applies it first, in order, so settle that deliberately.
+3. **Apply:** `CONFIRM_PRODUCTION_MIGRATION=APPLY npm run db:migrate`. Additive: two tables, two indexes,
+   four immutability triggers. Touches no existing table.
+4. **Recovery verification:** `npm run db:migration-status` (pending empty) and
+   `npm run db:verify-strand-checkpoints` (expects exactly the eight objects, counts 0/0/0), then
+   `npm run db:verify-season-snapshot-schema` to confirm snapshot rows and batches are unchanged.
+   Rollback is dropping nothing: leave the capture flag off and the empty tables are inert.
+5. **Dry run:** with the deployment live, set `STRAND_CHECKPOINT_CAPTURE=1`, redeploy, then call
+   `GET /api/cron/nhl-feed?only=strand&strandDryRun=1` with the cron secret. Expect `status:"ok"`,
+   `dryRun:true`, and either `idle:true` or plausible `inserted`/`deferred` counts. Nothing is written.
+6. **First bounded run:** `GET /api/cron/nhl-feed?only=strand` once. Check `report` (at most 300
+   inserted, `deferred` for the rest), then `db:verify-strand-checkpoints` counts. Repeat the call to confirm
+   a retry inserts nothing new. From then on the nightly cron does this.
+7. **Season end:** after the final regular-season game, once: `...?only=strand&strandEnd=1`.
+8. **Disable:** unset `STRAND_CHECKPOINT_CAPTURE` (or set it to `0`) and redeploy. Stored rows are
+   immutable and remain; the panel keeps showing them.
+
+**Production acceptance checks (read-only):** a dossier for a skater inside a captured window shows the
+checkpoint option labelled with its real GP ("11 GP (first capture after the 10-GP target)"); a skater
+with no row shows "No checkpoint has been captured ... yet" and no invented checkpoint; EDGE-based
+traits show the stored missing reason rather than a value when GP is misaligned; the panel title is
+"Season profile evolution · current-season observations" and says it is not the eight-trait STRAND;
+no horizontal overflow at 320/412/desktop; NAV, Gravity and the original STRAND are unchanged; the cron
+response carries `strandCheckpoints` and the existing feed keys.
