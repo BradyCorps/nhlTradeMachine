@@ -14,7 +14,7 @@ const loader = createRequire(import.meta.url).resolve("tsx");
 
 describe("issue report migration runner", () => {
   it("emits separate table and index commands for remote single-statement execution", async () => {
-    const migration = readMigrationFiles({ migrationsFolder: "drizzle" }).at(-1)!;
+    const migration = readMigrationFiles({ migrationsFolder: "drizzle" }).find(m => m.sql.join("").includes("issue_reports"))!;
     const client = createClient({ url: ":memory:" });
     try {
       await client.execute(migration.sql[0]!);
@@ -41,7 +41,7 @@ describe("issue report migration runner", () => {
     }).trim());
     const client = createClient({ url });
     try {
-      expect(run().appliedNow).toHaveLength(5);
+      expect(run().appliedNow).toHaveLength(6);
       await drizzle(client).insert(seasonSnapshotBatches).values({
         id: "snapshot:isolated-preservation", season: "2025-26", snapshotKind: "completed", asOf: "2026-09-13",
         coverage: "completed-season", statsSeason: "2025-26", contractSeason: "2026-27", modelVersion: "X-NAV 4.2",
@@ -53,8 +53,11 @@ describe("issue report migration runner", () => {
       const protectedRows = (await client.execute("SELECT * FROM season_snapshot_batches")).rows;
       const priorJournal = (await client.execute("SELECT * FROM __drizzle_migrations ORDER BY id")).rows;
       writeFileSync(journalPath, JSON.stringify(journal));
-      expect(run().appliedNow).toEqual(["0011_add_issue_reports"]);
+      expect(run().appliedNow).toEqual(["0012_add_strand_checkpoints"]);
+      // The additive STRAND-checkpoint migration leaves every earlier table and row alone.
       expect((await client.execute("SELECT * FROM issue_reports")).rows).toEqual([]);
+      expect((await client.execute("SELECT * FROM strand_checkpoints")).rows).toEqual([]);
+      expect((await client.execute("SELECT * FROM strand_reference_cohorts")).rows).toEqual([]);
       expect((await client.execute("SELECT * FROM season_snapshot_batches")).rows).toEqual(protectedRows);
       const upgradedJournal = (await client.execute("SELECT * FROM __drizzle_migrations ORDER BY id")).rows;
       expect(upgradedJournal.slice(0, -1)).toEqual(priorJournal);

@@ -32,7 +32,7 @@ describe("Phase 4 migration upgrade", () => {
       for (const [index, entry] of journal.slice(0, 4).entries()) {
         await client.execute({ sql: "INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)", args: [entry.hash, JOURNAL_TIMESTAMPS[index]!.when] });
       }
-      expect((await assertJournalIsCompatible(client, journal)).pending.map(entry => entry.tag)).toEqual(["0010_add_labs_evaluation_evidence", "0011_add_issue_reports"]);
+      expect((await assertJournalIsCompatible(client, journal)).pending.map(entry => entry.tag)).toEqual(["0010_add_labs_evaluation_evidence", "0011_add_issue_reports", "0012_add_strand_checkpoints"]);
       const before = await client.execute("SELECT id, integrity_hash FROM season_snapshot_batches");
       await migrate(drizzle(client), { migrationsFolder: migrationFolder() });
       expect((await client.execute("SELECT id, integrity_hash FROM season_snapshot_batches")).rows).toEqual(before.rows);

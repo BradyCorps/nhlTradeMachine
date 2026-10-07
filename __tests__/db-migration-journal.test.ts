@@ -12,6 +12,7 @@ describe("PL-7 migration journal", () => {
       "0009_add_labs_candidate_foundation",
       "0010_add_labs_evaluation_evidence",
       "0011_add_issue_reports",
+      "0012_add_strand_checkpoints",
     ]);
     expect(migrations.map(migration => migration.hash)).toEqual(
       expect.arrayContaining([
