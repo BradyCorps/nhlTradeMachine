@@ -19,6 +19,7 @@ import {
 } from "@/app/lib/player-data";
 import { FRANCHISE, SEASON } from "@/app/lib/season-config";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
+import { contractTabAsset } from "@/app/lib/contract-tab-asset";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
 import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import Header from "@/app/components/Header";
@@ -509,35 +510,7 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
         {/* ── Contract tab ───────────────────────── */}
         {activeTab === "contract" && hasContract && (
           <div style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px" }}>
-            <PlayerTimeline asset={{
-              id:             player.id,
-              name:           player.name,
-              position:       player.position as any,
-              age:            player.age,
-              capHit:         player.capHit,
-              yearsRemaining: player.yearsRemaining,
-              ptsPace:        player.ptsPace,
-              xGPace:         player.xGPace,
-              defRate:        player.defRate ?? 0.08,
-              avgTOI:         player.avgTOI,
-              qocIndex:       player.qocIndex,
-              baselinePtsPace: player.baselinePtsPace ?? undefined,
-              capCeiling: player.capCeiling,
-              pkTimeShare:    player.pkTimeShare ?? undefined,
-              hdFinishingDelta: player.hdFinishingDelta ?? undefined,
-              ops:            player.ops ?? undefined,
-              dps:            player.dps ?? undefined,
-              xgRelTM:        player.xgRelTM ?? undefined,
-              xgaRelTM:       player.xgaRelTM ?? undefined,
-              dzPct:          player.dzPct ?? undefined,
-              gsax:           player.gsax,
-              savePct:        player.savePct,
-              gamesStarted:   player.gamesStarted,
-              games:          player.games ?? 40,
-              hasLiveStats:   player.hasLiveStats,
-              retainedPct:    0,
-              multiplier:     1.0,
-            }} />
+            <PlayerTimeline asset={contractTabAsset(player)} />
           </div>
         )}
 

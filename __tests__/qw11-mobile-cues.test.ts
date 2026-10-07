@@ -33,16 +33,21 @@ describe("QW-11 mobile spacing and interaction cues", () => {
     }
   });
 
-  it("lets touch and keyboard users pin, dismiss, and compare scatter data in a table", () => {
+  it("lets touch and keyboard users select, remove, and compare scatter data in a table", () => {
     const scatter = read("app/components/NavLeagueScatter.tsx");
 
-    expect(scatter).toContain("pinnedId");
-    expect(scatter).toContain("aria-pressed={isPinned}");
-    expect(scatter).toContain("Dismiss pinned player");
+    // Selection goes through the shared searchable picker and removable chips,
+    // never a tab stop per plotted point; the old pin/dismiss intent is kept.
+    expect(scatter).toContain("PlayerPicker");
+    expect(scatter).toContain("Remove ${p.name} from the comparison");
+    expect(scatter).toContain("Reset comparisons");
     expect(scatter).toContain("Compare all plotted players in a table");
-    expect(scatter).toContain("Compared with");
+    expect(scatter).toContain("vs {lastName(currentPlayer)}");
     expect(scatter).toContain("<table");
-    expect(scatter).toContain('event.key === "Escape"');
+    const plot = read("app/components/NavLeagueScatterPlot.tsx");
+    expect(plot).toContain("accessibilityLayer={false}");           // no tab stop per point
+    expect(scatter + plot).not.toContain('role="button"');
+    expect(scatter).not.toMatch(/tabIndex=\{0\}\s*\n?\s*aria-pressed/);
   });
 
   it("keeps both bottom action sheets above the device safe area", () => {

@@ -134,7 +134,9 @@ describe("Canary — NHL EDGE usage and presentation", () => {
     expect(rollover).toContain("computeBreakout");
     expect(players).toContain('{ label: "High-danger finish (2025–26)"');
     expect(players).toContain("NHL EDGE high-danger finishing vs league average");
-    expect(players).toContain("hdFinishingDelta: player.hdFinishingDelta ?? undefined");
+    // The Contract tab no longer hand-picks fields; it crosses the same boundary (…asset spread).
+    expect(players).toContain("contractTabAsset(player)");
+    expect(fs.readFileSync("app/lib/contract-tab-asset.ts", "utf8")).toContain("toAssetInput(player)");
     // The shared adapter preserves the full player payload (EDGE fields
     // included), and the card renders the EDGE HD finishing read on the plate.
     expect(card).toContain("calculateAssetNAV(player)");
@@ -907,7 +909,8 @@ describe("Canary — Player Card AA redesign + FMV surplus read", () => {
     expect(card).toContain('scope="row"');
     // Bars are labelled for assistive tech, not color-only
     expect(card).toContain('role="img"');
-    expect(card).toContain(" percentile —");   // ordinal(stat.pct) + " percentile — <label>"
+    // ordinal(stat.pct) + " percentile of <peer group>" — a rank, not a quality word
+    expect(card).toContain(" percentile of ${peerLabel}");
     // Value breakdown uses a description list, not a bare grid of divs
     expect(card).toContain("<dl");
     expect(card).toContain("<dt>");
@@ -1069,7 +1072,7 @@ describe("Canary — development profile rationale copy", () => {
     expect(src).toContain("scoringTrajectoryLabels");
     expect(panelSrc).toContain("pedigreeWeight");
     expect(panelSrc).toContain("3-Year Scoring");
-    expect(panelSrc).toContain("SAMPLE CONF");
+    expect(panelSrc).toContain("EVIDENCE_SCORE_SHORT");
     expect(panelSrc).toContain("MiniScore");
     expect(panelSrc).toContain('label="Durability"');
     expect(panelSrc).toContain("avg games played per season vs 82");
@@ -1086,7 +1089,7 @@ describe("Canary — development profile rationale copy", () => {
     expect(panelSrc).toContain("Draft Sig");
     expect(panelSrc).toContain("Draft weight");
     expect(panelSrc).toContain("not career reputation");
-    expect(panelSrc).toContain("Sample Conf");
+    expect(panelSrc).toContain("Sample Evidence");
     expect(panelSrc).toContain("Projection");
     expect(panelSrc).toContain("Peak Left");
     expect(panelSrc).toContain("Durability");
@@ -2269,7 +2272,7 @@ describe("Canary — PA12 redefined analytics Outlook", () => {
 
     const outlook = read("app/components/PlayerOutlook.tsx");
     expect(outlook).toContain("deriveOutlook");
-    expect(outlook).toContain("Next-Season Projection");
+    expect(outlook).toContain("SCENARIO_RANGE_LABEL");
     expect(outlook).toContain("Scoring Trajectory");
     expect(outlook).toContain("Leading Indicators");
 
