@@ -83,3 +83,10 @@ its depth methodology or introduce new analytical claims.
   build passed (34 generated pages). Final PR CI is the full-suite head gate.
 - Live API verification is read-only. No migrations, capture, flags, new
   dependencies or Production deployment belong to this change's implementation.
+
+## October 8 maintained-lineup follow-up
+
+The user selected a manual Admin workflow that persists until updated and shows
+an as-of date. Its separate implementation and verification are documented in
+[Manual team projected lineups](MANUAL_TEAM_LINEUPS.md). This does not add an
+automatic article importer or turn projections into confirmed game sheets.

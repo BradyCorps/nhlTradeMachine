@@ -32,6 +32,7 @@ import TeamNavChart from "@/app/components/TeamNavChart";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 import TeamsLoading from "./loading";
 import TonightsGames from "@/app/components/TonightsGames";
+import TeamLineup from "@/app/components/TeamLineup";
 import { playerCountLabel } from "@/app/lib/player-terminology";
 import { DataContextRail } from "@/app/components/DataContextRail";
 import type { LeagueProvenance } from "@/app/lib/data-context";
@@ -858,7 +859,9 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
 
           {/* Projected Lines */}
           <div id={`team-${team.id}-roster`} className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
-            <LineupSection lines={lines} selection={team.observedSelection} />
+            <TeamLineup teamId={team.id} selection={team.observedSelection ?? DEFAULT_OBSERVED_SELECTION} roster={profile.roster}>
+              <LineupSection lines={lines} selection={team.observedSelection} />
+            </TeamLineup>
           </div>
 
           <details className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>

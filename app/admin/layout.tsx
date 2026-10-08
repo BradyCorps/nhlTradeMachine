@@ -5,6 +5,7 @@ const NAV_LINKS = [
   { href: "/admin",               label: "DASHBOARD"   },
   { href: "/admin/contracts",     label: "CONTRACTS"   },
   { href: "/admin/teams",         label: "TEAMS"       },
+  { href: "/admin/lineups",       label: "LINEUPS"     },
   { href: "/admin/trade-block",   label: "TRADE BLOCK" },
   { href: "/admin/trades",        label: "TRADES"      },
   { href: "/admin/draft-picks",   label: "PICKS"       },
