@@ -10,6 +10,8 @@ Legend: `[ ]` to-do · `[~]` partial / verify-then-close
 
 ---
 
+- [x] Preserve every selected forward in the model depth chart when more than four are pure centres; retain rankings and position labels, verify current Winnipeg roster exclusions and observed-stat parity. Scope and evidence: `docs/TEAMS_GAME_DAY.md`.
+
 - [x] Add NHL tonight’s-games cards to the home page and a Teams index tab with shareable matchup comparisons; label existing generated lines as a model depth chart. Reported game-day lines remain a separate source integration. Scope and evidence: `docs/TEAMS_GAME_DAY.md`.
 
 - [x] Add private text issue reporting and protected Admin review; disclose unavailable screenshots, prepare the additive journaled migration, and verify isolated submission/review journeys.

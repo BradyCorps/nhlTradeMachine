@@ -19,7 +19,7 @@ import { buildTeamContentionSnapshot, type TeamContentionSnapshot } from "@/app/
 import { computeTeamEdgeProfile, type TeamEdgeProfile } from "@/app/lib/team-edge-profile";
 import { computeRosterStrand } from "@/app/lib/roster-strand";
 import TeamStrand, { type TeamStrandData } from "@/app/components/TeamStrand";
-import { lineupContributionScore } from "@/app/lib/lineup-ranking";
+import { groupModelForwards, lineupContributionScore } from "@/app/lib/lineup-ranking";
 import { displayPosition } from "@/app/lib/display-position";
 import {
   gravityPositionPercentile,
@@ -329,9 +329,6 @@ function buildTeamLines(roster: Asset[], navMap: Record<string, XNAVResult>): Te
     navMap[p.id]?.total,
   );
 
-  const canPlayWing = (p: Asset) =>
-    ["W", "L", "R"].includes(p.position) || p.secondaryPosition === "W";
-
   const forwards = roster
     .filter(p => ["C", "W", "L", "R"].includes(p.position))
     .sort((a, b) => score(b) - score(a))
@@ -347,45 +344,7 @@ function buildTeamLines(roster: Asset[], navMap: Record<string, XNAVResult>): Te
     .sort((a, b) => score(b) - score(a))
     .slice(0, 2);
 
-  // Separate true centers (no wing flex) from flex players
-  const pureCenters = forwards.filter(p => p.position === "C" && !canPlayWing(p));
-  const flexCenters = forwards.filter(p => p.position === "C" && canPlayWing(p));
-  const wingers = forwards.filter(p => p.position !== "C");
-
-  // Slot top 4 pure centers first, then flex centers fill remaining center slots
-  const centerSlots: (Asset | null)[] = [null, null, null, null];
-  let ci = 0;
-  for (const c of pureCenters) {
-    if (ci >= 4) break;
-    centerSlots[ci++] = c;
-  }
-  for (const c of flexCenters) {
-    if (ci >= 4) break;
-    centerSlots[ci++] = c;
-  }
-
-  const usedIds = new Set(centerSlots.filter(Boolean).map(c => c!.id));
-  // Flex centers who didn't get a center slot go to the wing pool
-  const wingPool = [
-    ...wingers,
-    ...flexCenters.filter(c => !usedIds.has(c.id)),
-  ].sort((a, b) => score(b) - score(a));
-
-  const fwdLines: LineEntry[][] = [];
-  for (let i = 0; i < 4; i++) {
-    const line: LineEntry[] = [];
-    const c = centerSlots[i];
-    if (c) line.push(toEntry(c));
-    fwdLines.push(line);
-  }
-  for (let i = 0; i < 4; i++) {
-    while (fwdLines[i].length < 3 && wingPool.length > 0) {
-      const w = wingPool.shift()!;
-      if (usedIds.has(w.id)) continue;
-      usedIds.add(w.id);
-      fwdLines[i].push(toEntry(w));
-    }
-  }
+  const fwdLines = groupModelForwards(forwards).map(group => group.map(toEntry));
 
   const defPairs: LineEntry[][] = [];
   for (let i = 0; i < 3; i++) {

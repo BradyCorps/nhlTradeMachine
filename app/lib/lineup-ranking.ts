@@ -31,3 +31,19 @@ export function lineupContributionScore(pl: LineupRankingPlayer, navTotal?: numb
 
   return production + deploymentTrust + veteranTrust + matchupRole + navTiebreaker + leadership;
 }
+
+/** Group the selected, ranked forwards without changing their position labels. */
+export function groupModelForwards<T extends { id: string; position: string; secondaryPosition?: string | null }>(forwards: T[]): T[][] {
+  const pureCenters = forwards.filter(p => p.position === "C" && p.secondaryPosition !== "W");
+  const flexCenters = forwards.filter(p => p.position === "C" && p.secondaryPosition === "W");
+  const centers = [...pureCenters, ...flexCenters].slice(0, 4);
+  const usedIds = new Set(centers.map(p => p.id));
+  // These are model groups, not wing assignments. Surplus centers must remain
+  // visible alongside the other selected forwards, retaining their real labels.
+  const remaining = forwards.filter(p => !usedIds.has(p.id));
+  const groups: T[][] = Array.from({ length: 4 }, (_, i) => centers[i] ? [centers[i]] : []);
+  for (const group of groups) {
+    while (group.length < 3 && remaining.length > 0) group.push(remaining.shift()!);
+  }
+  return groups;
+}
