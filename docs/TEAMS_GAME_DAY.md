@@ -107,8 +107,9 @@ changed-file lint passed. An isolated browser fixture of the public roster showe
 four groups of three unique forwards, including Barron and Namestnikov, with
 Björck/Stevenson in the full roster and Hellebuyck absent. Page widths 320/412/1280
 had no overflow or browser errors. This checked the expanded Teams card; the local
-development server returned 404 for the existing detail route, which still needs
-hosted Preview verification. No route implementation was changed.
+development server returned 404 for the existing detail route. The hosted Preview
+of code commit `74e08f9` returned HTTP 200 with the Winnipeg Team Analytics title
+for `/teams/wpg?season=20262027&gameType=2`. No route implementation was changed.
 
 ## Verification
 
