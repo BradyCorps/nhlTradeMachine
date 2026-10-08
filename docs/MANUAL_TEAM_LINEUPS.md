@@ -86,3 +86,14 @@ merge/deployment, sign into Admin, reconcile roster membership if needed, enter
 current reported lines, then verify the as-of date, player links, scratches and
 model toggle on the public team page. No checkpoint flag or migration step is
 needed for manual lineups.
+
+## Release correction — October 8
+
+The initial final-head browser matrix timed out on `/teams/edm` because the
+client rejected HTTP 503 before consuming its response body. The fallback
+rendered correctly, but Chromium retained a pending request and never reached
+network idle. Consume the body before inspecting HTTP status; schema parsing
+and unavailable/stale behavior remain unchanged. The actual local production
+build reproduced the failure before correction. Against real isolated HTTP 503
+responses, the corrected page reached network idle in 1.8–3.0 seconds at
+320/412/1280px. A mocked finite response alone had missed this transport issue.

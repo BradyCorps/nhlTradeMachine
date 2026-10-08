@@ -21,8 +21,8 @@ export default function TeamLineup({ teamId, selection, roster, children }: {
       const signal = controller.signal;
       try {
         const response = await fetch(`/api/team-lineups?${query}`, { cache: "no-store", signal });
-        if (!response.ok) throw new Error();
         const body = await response.json();
+        if (!response.ok) throw new Error();
         const lineup = body.lineup === null ? null : storedManualLineupSchema.parse(body.lineup);
         if (lineup && (lineup.teamId !== teamId || lineup.season !== selection.season || lineup.gameType !== selection.gameType)) throw new Error();
         if (active && !signal.aborted) setState({ query, lineup, failed: false });
