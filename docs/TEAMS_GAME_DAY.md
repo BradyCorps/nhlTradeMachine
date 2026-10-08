@@ -68,6 +68,49 @@ headline record and clear measures first, explanations near charts, complete
 roster contributions and recent-game drill-downs. This change does not implement
 its depth methodology or introduce new analytical claims.
 
+## October 8 follow-up: retain the model and all selected players
+
+The requested approach is to keep the model depth chart. Existing per-team Admin
+Contracts assignments and roster exclusions remain the manual roster controls;
+game-day reported-line ingestion is not part of this correction. The full assigned
+roster includes players outside the model's top twelve forwards, six defenders
+and two goalies. A scratch is not an instruction to remove a player's contract
+from the assigned roster.
+
+The forward grouping had a separate display defect: it selected twelve forwards,
+reserved four centre slots, then discarded any additional pure centres. Winnipeg's
+selected Morgan Barron and Vladislav Namestnikov consequently disappeared. The
+grouping now keeps every selected forward, using the existing ranking for remaining
+places and preserving each player's actual position label. These are model groups,
+not assertions that a surplus centre plays wing. Ranking inputs, selection limits,
+defence/goalie ranking, NAV and statistics readers are unchanged.
+
+Read-only October 8 checks of the public current-season payload confirm Clay
+Stevenson and Viggo Björck assigned to WPG and Connor Hellebuyck excluded. The
+October 7 page had served an older CDN response after the underlying roster was
+corrected; the exact Teams request subsequently refreshed to the corrected roster.
+Björck is in the full roster, but his zero 2025–26 model games place him below the
+top-twelve cutoff. His observed 2026–27 regular-season record has four games.
+
+The public `observedStats` overlay matched NHL's season-filtered regular-season
+summary for all 22 Winnipeg players with summary rows: 196 checked fields,
+including the seconds-to-minutes conversion for skater average TOI. The other 18
+assigned depth/prospect players were explicitly missing observations, rather than
+receiving invented zeros. This verifies current displayed observations; it does
+not independently prove scheduled historical snapshot persistence. No real capture,
+Production record edit, migration, flag or cache mutation was performed in this
+follow-up. Existing season/source gates and withheld EDGE evolution metrics remain.
+
+Follow-up verification: full suite 2,886 passed / zero failed, then seven focused
+tests passed after adding one more centre/flex-priority regression; typecheck and
+changed-file lint passed. An isolated browser fixture of the public roster showed
+four groups of three unique forwards, including Barron and Namestnikov, with
+Björck/Stevenson in the full roster and Hellebuyck absent. Page widths 320/412/1280
+had no overflow or browser errors. This checked the expanded Teams card; the local
+development server returned 404 for the existing detail route. The hosted Preview
+of code commit `74e08f9` returned HTTP 200 with the Winnipeg Team Analytics title
+for `/teams/wpg?season=20262027&gameType=2`. No route implementation was changed.
+
 ## Verification
 
 - Parser and route tests cover Eastern dates/DST, actual zero scores, scheduled
