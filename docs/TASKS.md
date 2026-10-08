@@ -10,6 +10,8 @@ Legend: `[ ]` to-do · `[~]` partial / verify-then-close
 
 ---
 
+- [x] Add per-team manual projected lineups in Admin, retained until updated with an as-of date; keep the model selectable and preserve independent roster/statistics handling. Scope and evidence: `docs/MANUAL_TEAM_LINEUPS.md`.
+
 - [x] Add NHL tonight’s-games cards to the home page and a Teams index tab with shareable matchup comparisons; label existing generated lines as a model depth chart. Reported game-day lines remain a separate source integration. Scope and evidence: `docs/TEAMS_GAME_DAY.md`.
 
 - [x] Add private text issue reporting and protected Admin review; disclose unavailable screenshots, prepare the additive journaled migration, and verify isolated submission/review journeys.

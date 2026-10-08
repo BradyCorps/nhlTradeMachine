@@ -26,6 +26,12 @@ export default async function AdminDashboard() {
 
   const sections = [
     {
+      href: "/admin/lineups",
+      label: "PROJECTED LINEUPS",
+      desc: "Arrange team forward lines, defence pairs, goalie order and reported scratches as lineup news changes.",
+      stat: "Manual per-team editing",
+    },
+    {
       href:  "/admin/contracts",
       label: "CONTRACTS",
       desc:  "Audit and override player contracts. Compare bundled vs scraped cap hits, flag deltas, add new players.",
