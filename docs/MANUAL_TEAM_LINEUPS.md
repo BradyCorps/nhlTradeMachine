@@ -45,7 +45,10 @@ atomic compare-and-set rejects stale saves/removals with HTTP 409. Reload and
 reapply changes after a conflict. An ambiguous response should be reconciled by
 reloading; repeating the old revision cannot overwrite a newer save.
 
-Admin GET/POST/DELETE authorize before roster or database work. Public GET is
+Admin GET/POST/DELETE authorize before importing or initializing roster/database
+work. Storage initializes inside the guarded read boundary, so even a missing
+database configuration yields labelled unavailability rather than a module-load
+crash. Public GET is
 read-only. Both use no-store responses. The new writer only changes its own
 setting key; it never changes roster rows, observations, contracts, valuation,
 model ranking, capture settings or historical evidence. This feature does not
@@ -58,8 +61,9 @@ validation, authorization-before-work, persistence, team/season/competition
 isolation, concurrency, duplicate retries, removal and corrupt storage. Browser
 checks use local fixtures; they do not create a Production lineup.
 
-Local verification: `npm test` passed 2,898/2,898 across 228 files; the 15 new
-focused tests passed. Typecheck, changed-file ESLint and production build passed.
+Local verification: `npm test` passed 2,898/2,898 across 228 files; the initial 15 new
+focused tests passed. A subsequent hosted initialization correction passed all
+16 focused tests, including an import-time database failure fixture. Typecheck, changed-file ESLint and production build passed.
 Eleven fixture browser journeys passed against the local production build:
 keyboard save, reopen, 320px editor, manual/model views at 320/412/1280px,
 failed refresh, removed player, other team, removal fallback and storage failure.
@@ -70,7 +74,11 @@ were cleared from this worktree before the successful clean build.
 Actual local HTTP checks against an isolated database returned public
 `200 {"lineup":null}` with `Cache-Control: no-store`, and Admin GET/POST/DELETE
 returned 401 without credentials. Hosted authenticated save/removal and
-Production lineups have not been exercised.
+Production lineups have not been exercised. The first Preview smoke check
+found its missing database configuration caused an import-time failure; this
+was corrected with lazy initialization, without changing any environment.
+Expect labelled public 503 in a Preview without database access and Admin 401
+without app credentials; a configured database is required for hosted saves.
 
 Delivery uses a separate PR from the model forward-group coverage correction
 (PR #50). Neither merge nor Production edits are part of this task. After normal

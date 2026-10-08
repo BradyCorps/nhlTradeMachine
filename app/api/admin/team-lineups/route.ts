@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/app/lib/admin-auth";
-import { getCachedRoster } from "@/app/lib/cached-roster";
 import { TEAMS_DB } from "@/app/lib/db";
 import { parseObservedSelection } from "@/app/lib/observed-season";
 import { manualLineupSchema, validateLineupPlayers } from "@/app/lib/manual-team-lineups";
@@ -12,6 +11,9 @@ export const maxDuration = 60;
 const writeSchema = z.object({ lineup: manualLineupSchema, expectedRevision: z.string().uuid().nullable() }).strict();
 const deleteSchema = z.object({ teamId: z.string(), season: z.string(), gameType: z.number(), expectedRevision: z.string().uuid() }).strict();
 const headers = { "Cache-Control": "no-store" };
+// Initialize after authorization and share loading across concurrent requests.
+let rosterModule: Promise<typeof import("@/app/lib/cached-roster")> | undefined;
+const loadRoster = () => rosterModule ??= import("@/app/lib/cached-roster");
 
 function identity(req: Request) {
   const params = new URL(req.url).searchParams;
@@ -26,6 +28,7 @@ export async function GET(req: Request) {
   let key;
   try { key = identity(req); } catch { return NextResponse.json({ error: "Invalid lineup selection" }, { status: 400 }); }
   try {
+    const { getCachedRoster } = await loadRoster();
     const [lineup, roster] = await Promise.all([readManualLineup(key.teamId, key), getCachedRoster()]);
     const players = roster.value.players.filter(p => p.teamId === key.teamId && p.position !== "Pick")
       .map(p => ({ id: String(p.id), name: p.name, position: p.position, teamId: p.teamId }));
@@ -41,6 +44,7 @@ export async function POST(req: Request) {
   const parsed = writeSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid lineup" }, { status: 400 });
   try {
+    const { getCachedRoster } = await loadRoster();
     const roster = await getCachedRoster();
     try { validateLineupPlayers(parsed.data.lineup, roster.value.players); }
     catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
