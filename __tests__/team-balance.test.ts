@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balanceDifference, balanceValue, buildTeamBalance, gameBalanceSelection, type TeamBalanceInput } from "@/app/lib/team-balance";
+import { balanceDifference, balanceValue, buildTeamBalance, gameBalanceSelection, teamPercentages, type TeamBalanceInput } from "@/app/lib/team-balance";
 
 const selection = { season: "20262027", gameType: 2 } as const;
 const team: TeamBalanceInput = { id: "WPG", name: "Winnipeg Jets", observedSelection: selection, observedCoverage: "available",
@@ -58,5 +58,33 @@ describe("daily matchup statistics identity", () => {
     expect(gameBalanceSelection({ season: 20262027, gameType: 1 })).toBeNull();
     expect(gameBalanceSelection({ season: 20242025, gameType: 2 })).toBeNull();
     expect(gameBalanceSelection({ season: 20262027, gameType: 4 })).toBeNull();
+  });
+});
+
+describe("NHL-reported team percentages", () => {
+  const percentageTeam: TeamBalanceInput = { ...team, record: { ...team.record!, powerPlayPct: .4, penaltyKillPct: .9, faceoffWinPct: .457983 } };
+  it("converts reported fractions to percentages once, preserving precision", () => {
+    expect(teamPercentages(percentageTeam, selection)).toMatchObject({ games: 4, powerPlay: 40, penaltyKill: 90, faceoffs: .457983 * 100 });
+  });
+  it("preserves reported zero and one without assuming opportunity counts", () => {
+    expect(teamPercentages({ ...team, record: { ...team.record!, powerPlayPct: 0, penaltyKillPct: 1, faceoffWinPct: 0 } }, selection)).toMatchObject({ powerPlay: 0, penaltyKill: 100, faceoffs: 0 });
+  });
+  it("does not substitute zeros for missing fields or infer one rate from another", () => {
+    expect(teamPercentages({ ...team, record: { ...team.record!, penaltyKillPct: .9, faceoffWinPct: null } }, selection)).toMatchObject({ powerPlay: null, penaltyKill: 90, faceoffs: null });
+  });
+  it("withholds percentages before any games are recorded", () => {
+    expect(teamPercentages({ ...percentageTeam, record: { ...percentageTeam.record!, gamesPlayed: 0 } }, selection)).toMatchObject({ games: 0, powerPlay: null, penaltyKill: null, faceoffs: null });
+  });
+  it("withholds the wrong season, competition and unavailable coverage", () => {
+    for (const candidate of [{ ...percentageTeam, observedSelection: { season: "20252026", gameType: 2 } as const },
+      { ...percentageTeam, observedSelection: { season: "20262027", gameType: 3 } as const },
+      { ...percentageTeam, observedCoverage: "unavailable" }]) {
+      expect(teamPercentages(candidate, selection)).toMatchObject({ powerPlay: null, penaltyKill: null, faceoffs: null });
+    }
+  });
+  it("rejects invalid fractions rather than guessing whether units changed", () => {
+    for (const powerPlayPct of [-.1, 40, NaN, Infinity]) {
+      expect(teamPercentages({ ...percentageTeam, record: { ...percentageTeam.record!, powerPlayPct } }, selection).powerPlay).toBeNull();
+    }
   });
 });

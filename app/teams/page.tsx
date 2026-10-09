@@ -34,6 +34,7 @@ import TeamsLoading from "./loading";
 import TonightsGames from "@/app/components/TonightsGames";
 import TeamRosterInsights from "@/app/components/TeamRosterInsights";
 import TeamBalanceCharts from "@/app/components/TeamBalanceCharts";
+import TeamPercentageCharts from "@/app/components/TeamPercentageCharts";
 import { buildTeamBalance } from "@/app/lib/team-balance";
 import { playerCountLabel } from "@/app/lib/player-terminology";
 import { DataContextRail } from "@/app/components/DataContextRail";
@@ -692,6 +693,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
 
           <div id={`team-${team.id}-balance`} className="border-t" style={{ borderColor: "var(--ledger-rule)" }}>
             <TeamBalanceCharts teams={[buildTeamBalance(team, team.observedSelection ?? DEFAULT_OBSERVED_SELECTION)]} selection={team.observedSelection ?? DEFAULT_OBSERVED_SELECTION} />
+            <TeamPercentageCharts teams={[team]} selection={team.observedSelection ?? DEFAULT_OBSERVED_SELECTION} />
           </div>
 
           {/* Roster overview strip */}
@@ -761,7 +763,9 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
               <div className="text-[9px] font-black uppercase tracking-[0.15em] mb-2" style={{ color: "var(--ledger-ink-faint)" }}>
                 Team DNA
               </div>
-              <TeamStrand strand={strand} teamName={team.name} />
+              <div className="w-full max-w-4xl">
+                <TeamStrand strand={strand} teamName={team.name} />
+              </div>
             </div>
           )}
 

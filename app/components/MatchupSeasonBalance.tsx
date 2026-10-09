@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import TeamBalanceCharts from "@/app/components/TeamBalanceCharts";
+import TeamPercentageCharts from "@/app/components/TeamPercentageCharts";
 import { observedQuery } from "@/app/lib/observed-season";
 import { buildTeamBalance, gameBalanceSelection, sameObservedSelection, type TeamBalanceInput } from "@/app/lib/team-balance";
 import type { NhlGame } from "@/app/lib/nhl-games";
@@ -34,7 +35,8 @@ export default function MatchupSeasonBalance({ game, teams }: { game: NhlGame; t
   if (!provided && !current) return <p role="status" className="text-[11px] my-3">Loading this matchup’s season statistics…</p>;
   if (!provided && current?.failed) return <p role="status" className="text-[11px] my-3">This matchup’s season statistics are temporarily unavailable.</p>;
   const source = provided ? teams : current?.teams ?? [];
-  const balance = [game.away, game.home].map(team => buildTeamBalance(source.find(row => row.id === team.abbrev)
-    ?? { id: team.abbrev, name: team.name, record: null }, selection));
-  return <TeamBalanceCharts teams={balance} selection={selection} />;
+  const selectedTeams = [game.away, game.home].map(team => source.find(row => row.id === team.abbrev)
+    ?? { id: team.abbrev, name: team.name, record: null });
+  const balance = selectedTeams.map(team => buildTeamBalance(team, selection));
+  return <><TeamBalanceCharts teams={balance} selection={selection} /><TeamPercentageCharts teams={selectedTeams} selection={selection} /></>;
 }

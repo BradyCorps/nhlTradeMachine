@@ -6,7 +6,8 @@ export interface TeamBalanceInput {
   observedSelection?: ObservedSelection;
   observedCoverage?: string;
   record: { gamesPlayed: number | null; goalsFor: number | null; goalsAgainst: number | null;
-    shotsForPerGame: number | null; shotsAgainstPerGame: number | null } | null;
+    shotsForPerGame: number | null; shotsAgainstPerGame: number | null;
+    powerPlayPct?: number | null; penaltyKillPct?: number | null; faceoffWinPct?: number | null } | null;
 }
 export interface TeamBalance {
   id: string; name: string; games: number | null;
@@ -49,4 +50,12 @@ export function balanceDifference(forValue: number | null, againstValue: number 
 export function balanceValue(value: number | null, signed = false) {
   if (value === null || !Number.isFinite(value)) return "Unavailable";
   return `${signed && value > 0 ? "+" : ""}${value.toFixed(2)}`;
+}
+
+export function teamPercentages(team: TeamBalanceInput, selection: ObservedSelection) {
+  const games = buildTeamBalance(team, selection).games;
+  const percent = (value: number | null | undefined) => games !== null && games > 0
+    && typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1 ? value * 100 : null;
+  return { id: team.id, name: team.name, games,
+    powerPlay: percent(team.record?.powerPlayPct), penaltyKill: percent(team.record?.penaltyKillPct), faceoffs: percent(team.record?.faceoffWinPct) };
 }
