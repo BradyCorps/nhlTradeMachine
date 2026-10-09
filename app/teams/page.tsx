@@ -33,6 +33,8 @@ import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 import TeamsLoading from "./loading";
 import TonightsGames from "@/app/components/TonightsGames";
 import TeamRosterInsights from "@/app/components/TeamRosterInsights";
+import TeamBalanceCharts from "@/app/components/TeamBalanceCharts";
+import { buildTeamBalance } from "@/app/lib/team-balance";
 import { playerCountLabel } from "@/app/lib/player-terminology";
 import { DataContextRail } from "@/app/components/DataContextRail";
 import type { LeagueProvenance } from "@/app/lib/data-context";
@@ -688,6 +690,10 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
             </div>
           )}
 
+          <div id={`team-${team.id}-balance`} className="border-t" style={{ borderColor: "var(--ledger-rule)" }}>
+            <TeamBalanceCharts teams={[buildTeamBalance(team, team.observedSelection ?? DEFAULT_OBSERVED_SELECTION)]} selection={team.observedSelection ?? DEFAULT_OBSERVED_SELECTION} />
+          </div>
+
           {/* Roster overview strip */}
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
             <StatCell label="Avg Age" value={avgAge.toFixed(1)} />
@@ -1204,7 +1210,7 @@ export default function TeamsPage() {
             </p>
           </div>
 
-          {detailProfile && <DossierNav sections={[{ id: `team-${detailProfile.team.id}-window`, label: "Window & cap" }, { id: `team-${detailProfile.team.id}-roster`, label: "Lineup" }, { id: `team-${detailProfile.team.id}-leaders`, label: "Season leaders" }]} />}
+          {detailProfile && <DossierNav sections={[{ id: `team-${detailProfile.team.id}-window`, label: "Window & cap" }, { id: `team-${detailProfile.team.id}-balance`, label: "Scoring & shots" }, { id: `team-${detailProfile.team.id}-roster`, label: "Lineup" }, { id: `team-${detailProfile.team.id}-leaders`, label: "Season leaders" }]} />}
           {detailProfile ? (
             <TeamCard
               profile={detailProfile}
@@ -1271,6 +1277,7 @@ export default function TeamsPage() {
               capSpace: tp.team.capSpace,
               present: tp.roster.length ? tp.contention.present : null,
               future: tp.roster.length ? tp.contention.future : null,
+              statistics: tp.team,
             }))}
             matchupId={matchupId}
             onMatchupChange={setMatchupId}

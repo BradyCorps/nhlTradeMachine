@@ -10,6 +10,8 @@ Legend: `[ ]` to-do · `[~]` partial / verify-then-close
 
 ---
 
+- [x] Draft shared Recharts goals/shot-balance panels for expanded and dedicated team views and daily game comparisons, using game-specific observed statistics with value tables and explicit unavailable states. Scope and review: `docs/TEAM_BALANCE_CHARTS.md`.
+
 - [x] Make expanded Teams cards share the dedicated team page’s compact lineup statistics, scoring leaders and goalie results while preserving mobile sheet navigation.
 
 - [x] Enrich team detail pages with selected-season lineup statistics, scoring leaders and goalie results; compact the maintained lineup on desktop without changing assignments or the model.
