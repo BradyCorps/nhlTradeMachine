@@ -33,6 +33,7 @@ import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 import TeamsLoading from "./loading";
 import TonightsGames from "@/app/components/TonightsGames";
 import TeamLineup from "@/app/components/TeamLineup";
+import TeamRosterInsights from "@/app/components/TeamRosterInsights";
 import { playerCountLabel } from "@/app/lib/player-terminology";
 import { DataContextRail } from "@/app/components/DataContextRail";
 import type { LeagueProvenance } from "@/app/lib/data-context";
@@ -859,9 +860,11 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
 
           {/* Projected Lines */}
           <div id={`team-${team.id}-roster`} className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
-            <TeamLineup teamId={team.id} selection={team.observedSelection ?? DEFAULT_OBSERVED_SELECTION} roster={profile.roster}>
+            {showDetailLink ? <TeamLineup teamId={team.id} selection={team.observedSelection ?? DEFAULT_OBSERVED_SELECTION} roster={profile.roster}>
               <LineupSection lines={lines} selection={team.observedSelection} />
-            </TeamLineup>
+            </TeamLineup> : <TeamRosterInsights teamId={team.id} selection={team.observedSelection ?? DEFAULT_OBSERVED_SELECTION} roster={profile.roster}>
+              <LineupSection lines={lines} selection={team.observedSelection} />
+            </TeamRosterInsights>}
           </div>
 
           <details className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
@@ -1200,11 +1203,11 @@ export default function TeamsPage() {
               {detailProfile?.team.name ?? detailTeamId}
             </h1>
             <p className="text-[11px] mt-1 leading-relaxed" style={{ color: "var(--ledger-ink-faint)" }}>
-              Team detail — contention window, roster NAV, cap situation, Team DNA, EDGE profile, and model depth chart.
+              Team detail — season leaders, projected lineup, contention window, roster NAV, cap situation, Team DNA, and EDGE profile.
             </p>
           </div>
 
-          {detailProfile && <DossierNav sections={[{ id: `team-${detailProfile.team.id}-window`, label: "Window & cap" }, { id: `team-${detailProfile.team.id}-roster`, label: "Roster" }]} />}
+          {detailProfile && <DossierNav sections={[{ id: `team-${detailProfile.team.id}-window`, label: "Window & cap" }, { id: `team-${detailProfile.team.id}-roster`, label: "Lineup" }, { id: `team-${detailProfile.team.id}-leaders`, label: "Season leaders" }]} />}
           {detailProfile ? (
             <TeamCard
               profile={detailProfile}
