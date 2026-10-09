@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { gameScore, gameStatus, type NhlGame, type NhlGamesBoard } from "@/app/lib/nhl-games";
 import { DEFAULT_OBSERVED_SELECTION, OBSERVED_SEASONS, observedQuery } from "@/app/lib/observed-season";
+import MatchupSeasonBalance from "@/app/components/MatchupSeasonBalance";
+import type { TeamBalanceInput } from "@/app/lib/team-balance";
 
 export interface MatchupTeamOutlook {
   id: string;
@@ -12,6 +14,7 @@ export interface MatchupTeamOutlook {
   capSpace: number | null;
   present: number | null;
   future: number | null;
+  statistics?: TeamBalanceInput;
 }
 
 const ink = "var(--ledger-ink)", faint = "var(--ledger-ink-faint)", rule = "var(--ledger-rule)";
@@ -72,9 +75,11 @@ export function MatchupComparison({ game, teams }: { game: NhlGame; teams: Match
       </table>
       <p className="text-[10px] leading-relaxed mb-3" style={{ color: faint }}>Outlook and NAV use current rosters and contracts with 2025–26 model inputs. They describe roster strength and contract value, not the probability of winning this game.</p>
 
+      <MatchupSeasonBalance game={game} teams={teams.flatMap(team => team.statistics ? [team.statistics] : [])} />
+
       <div className="border p-3 mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
         <h3 className="text-[11px] font-black mb-1">Game-day lines &amp; starting goalies</h3>
-        <p className="text-[11px] leading-relaxed">Reported lines and starters are not available in this view yet. The team pages show a model depth chart; tonight&apos;s combinations, scratches and goalie choices can differ.</p>
+        <p className="text-[11px] leading-relaxed">Team pages show maintained projected lineups when available, with an as-of date, plus a selectable model depth chart. These are not confirmed game-day lines or starter announcements; tonight&apos;s combinations, scratches and goalie choices can differ.</p>
         <a href={game.nhlUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center min-h-11 text-[11px] underline" style={{ color: "var(--ledger-red)" }}>NHL game centre ↗</a>
       </div>
       <div className="grid grid-cols-2 gap-2">
